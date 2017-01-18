@@ -1,7 +1,6 @@
 import pickle
 import time
 
-from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import GridSearchCV
 from sklearn.svm import LinearSVC
 
@@ -19,19 +18,15 @@ cells_per_block = 2
 spatial_size = (32, 32)
 hist_bins = 32
 hist_range = (0, 256)
-cspace = 'HSV'
+cspace = 'LAB'
 hog_channel = 0
 pca = 64
 
-X_train = extract_features(X_train, cspace=cspace, spatial_size=spatial_size, hist_bins=hist_bins,
-                                 hist_range=hist_range, orient=orient,
-                                 pix_per_cell=pix_per_cell, cells_per_block=cells_per_block, hog_channel=hog_channel,
-                                 normalize=True, pca=None)
+X_train = extract_features(X_train, cspace=cspace, orient=orient, pix_per_cell=pix_per_cell,
+                           cells_per_block=cells_per_block, normalize=True)
 
-X_val = extract_features(X_val, cspace=cspace, spatial_size=spatial_size, hist_bins=hist_bins,
-                         hist_range=hist_range, orient=orient,
-                         pix_per_cell=pix_per_cell, cells_per_block=cells_per_block, hog_channel=hog_channel,
-                         normalize=True, pca=None)
+X_val = extract_features(X_val, cspace=cspace, orient=orient, pix_per_cell=pix_per_cell,
+                         cells_per_block=cells_per_block, normalize=True)
 
 parameters = [{'loss': ['squared_hinge'],
                'C': [1e-3, 1e-2, 1e-1, 1, 1e1, 1e2],
@@ -57,19 +52,19 @@ print('Best params: ', cls.best_params_)
 print('Train Accuracy of SVC = ', cls.score(X_train, y_train))
 print('Validation Accuracy of SVC = ', cls.score(X_val, y_val))
 
-perf_runs = 10
-t = time.time()
-_ = [cls.predict(X_val[i].reshape(1, -1)) for i in range(perf_runs)]
-t2 = time.time()
-print((t2 - t) / perf_runs, ' seconds avg for one prediction')
-
-# clf = CalibratedClassifierCV(cls)
-# clf.fit(X_train, y_train)
+# perf_runs = 10
+# t = time.time()
+# _ = [cls.predict(X_val[i].reshape(1, -1)) for i in range(perf_runs)]
+# t2 = time.time()
+# print((t2 - t) / perf_runs, ' seconds avg for one prediction')
 #
+# clf = CalibratedClassifierCV(cls.best_estimator_)
+# clf.fit(X_train, y_train)
+
 # t = time.time()
 # _ = [clf.predict_proba(X_val[i].reshape(1, -1)) for i in range(perf_runs)]
 # t2 = time.time()
 # print((t2 - t) / perf_runs, ' seconds avg for one propability prediction')
 
-with open('../models/svm.p', 'wb') as f:
+with open('../models/svm_hog.p', 'wb') as f:
     pickle.dump(cls.best_estimator_, f)

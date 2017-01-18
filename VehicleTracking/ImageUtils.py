@@ -11,7 +11,7 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     # Iterate through the bounding boxes
     for bbox in bboxes:
         # Draw a rectangle given bbox coordinates
-        cv2.rectangle(draw_img, bbox[0], bbox[1], color, thick)
+        cv2.rectangle(draw_img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, thick)
     # Return the image copy with boxes drawn
     return draw_img
 
@@ -22,30 +22,47 @@ def bin_spatial(img, size=(32, 32)):
     return features
 
 
-def cut_out_window(img, window, resize=(64, 64)):
-    return cv2.resize(img[window[0][1]:window[1][1], window[0][0]:window[1][0], :], resize)
+def cut_out_window(img, window):
+    return img[window[1]:window[3], window[0]:window[2], :]
 
 
-def cut_out_windows(img, windows, resize=(64,64)):
+def cut_out_windows(img, windows):
+    height = windows[0][3] - windows[0][1]
+    width = windows[0][2] - windows[0][0]
 
-    cut_outs = np.zeros((len(windows), *resize, img.shape[-1]), dtype=np.float32)
+    cut_outs = np.zeros((len(windows), height, width, img.shape[-1]), dtype=np.float32)
     for i in range(len(windows)):
-        cut_outs[i] = cut_out_window(img, windows[i], resize)
+        cut_outs[i] = cut_out_window(img, windows[i])
 
-    return cut_outs
+    return cut_outs.astype(np.uint8)
 
 
 # Define a function to return HOG features and visualization
-def hog_features(img, orient, pix_per_cell, cell_per_block, vis=False, feature_vec=True):
+def hog_features(img, orient, pix_per_cell, cells_per_block, vis=False):
+    if len(img.shape) == 2:
+        img = np.expand_dims(img, axis=2)
+
+    features = np.zeros((img.shape[2], hog_feature_size(img, pix_per_cell, cells_per_block, orient)))
+
     if vis:
-        features, hog_image = hog(img, orientations=orient, pixels_per_cell=(pix_per_cell, pix_per_cell),
-                                  cells_per_block=(cell_per_block, cell_per_block), transform_sqrt=True,
-                                  visualise=True, feature_vector=False)
+        hog_image = np.zeros(img.shape, dtype=np.float32)
+
+    for ch in range(img.shape[2]):
+        hog_result = hog(img[:, :, ch], orientations=orient, pixels_per_cell=(pix_per_cell, pix_per_cell),
+                         cells_per_block=(cells_per_block, cells_per_block), transform_sqrt=True,
+                         visualise=vis, feature_vector=True)
+
+        if vis:
+            features[ch] = hog_result[0]
+            hog_image[:, :, ch] = hog_result[1]
+        else:
+            features[ch] = hog_result
+
+    features = features.ravel()
+
+    if vis:
         return features, hog_image
     else:
-        features = hog(img, orientations=orient, pixels_per_cell=(pix_per_cell, pix_per_cell),
-                       cells_per_block=(cell_per_block, cell_per_block), transform_sqrt=True,
-                       visualise=False, feature_vector=feature_vec)
         return features
 
 
@@ -87,43 +104,57 @@ def hog_feature_size(image, pixels_per_cell, cells_per_block, orient):
     return n_blocks ** 2 * cells_per_block ** 2 * orient
 
 
-def extract_features(images, cspace='RGB', spatial_size=(32, 32), hist_bins=32, hist_range=(0, 256), orient=9,
-                     pix_per_cell=8, cells_per_block=2, hog_channel=0, normalize=True, pca=None):
-    spatials = np.zeros((len(images), spatial_size[0] * spatial_size[1] * 3))
-    hists = np.zeros((len(images), hist_bins * 3))
-    hogs = np.zeros((len(images), hog_feature_size(images[0], pix_per_cell, cells_per_block, orient)))
+# def extract_features(images, cspace='RGB', spatial_size=(32, 32), hist_bins=32, hist_range=(0, 256), orient=9,
+#                      pix_per_cell=8, cells_per_block=2, hog_channel=0, normalize=True, pca=None):
+#     spatials = np.zeros((len(images), spatial_size[0] * spatial_size[1] * 3))
+#     hists = np.zeros((len(images), hist_bins * 3))
+#     hogs = np.zeros((len(images), hog_feature_size(images[0], pix_per_cell, cells_per_block, orient)))
+#
+#     for i, img in enumerate(images):
+#         feature_image = convert_cspace(img, cspace)
+#
+#         spatials[i] = bin_spatial(feature_image, size=spatial_size)
+#         hists[i] = color_hist(feature_image, bins=hist_bins, bins_range=hist_range)
+#         hogs[i] = hog_features(feature_image[:, :, hog_channel], orient, pix_per_cell, cells_per_block, vis=False)
+#
+#     if normalize:
+#         spatials = StandardScaler().fit_transform(spatials)
+#         hists = StandardScaler().fit_transform(hists)
+#         hogs = StandardScaler().fit_transform(hogs)
+#
+#     if pca and type(pca) is int:
+#         pca_spatials = PCA(n_components=pca)
+#         spatials = pca_spatials.fit_transform(spatials)
+#         pca_hists = PCA(n_components=pca)
+#         hists = pca_hists.fit_transform(hists)
+#         pca_hogs = PCA(n_components=pca)
+#         hogs = pca_hogs.fit_transform(hogs)
+#
+#         features = np.concatenate((spatials, hists, hogs), axis=1)
+#         return features, (pca_spatials, pca_hists, pca_hogs)
+#
+#     elif pca and (type(pca) is list or type(pca) is tuple):
+#         spatials = pca[0].transform(spatials)
+#         hists = pca[1].transform(hists)
+#         hogs = pca[2].transform(hogs)
+#
+#     features = np.concatenate((spatials, hists, hogs), axis=1)
+#     return features
+#
+
+def extract_features(images, cspace='RGB', orient=9, pix_per_cell=8, cells_per_block=2, normalize=True):
+
+    hogs = np.zeros((len(images), 3 * hog_feature_size(images[0], pix_per_cell, cells_per_block, orient)))
 
     for i, img in enumerate(images):
         feature_image = convert_cspace(img, cspace)
 
-        spatials[i] = bin_spatial(feature_image, size=spatial_size)
-        hists[i] = color_hist(feature_image, bins=hist_bins, bins_range=hist_range)
-        hogs[i] = hog_features(feature_image[:, :, hog_channel], orient, pix_per_cell, cells_per_block, vis=False,
-                               feature_vec=True)
+        hogs[i] = hog_features(feature_image, orient, pix_per_cell, cells_per_block, vis=False)
 
     if normalize:
-        spatials = StandardScaler().fit_transform(spatials)
-        hists = StandardScaler().fit_transform(hists)
         hogs = StandardScaler().fit_transform(hogs)
 
-    if pca and type(pca) is int:
-        pca_spatials = PCA(n_components=pca)
-        spatials = pca_spatials.fit_transform(spatials)
-        pca_hists = PCA(n_components=pca)
-        hists = pca_hists.fit_transform(hists)
-        pca_hogs = PCA(n_components=pca)
-        hogs = pca_hogs.fit_transform(hogs)
-
-        features = np.concatenate((spatials, hists, hogs), axis=1)
-        return features, (pca_spatials, pca_hists, pca_hogs)
-
-    elif pca and (type(pca) is list or type(pca) is tuple):
-        spatials = pca[0].transform(spatials)
-        hists = pca[1].transform(hists)
-        hogs = pca[2].transform(hogs)
-
-    features = np.concatenate((spatials, hists, hogs), axis=1)
-    return features
+    return hogs
 
 
 def slide_window(img, x_start_stop=None, y_start_stop=None,
@@ -152,7 +183,8 @@ def slide_window(img, x_start_stop=None, y_start_stop=None,
     nx_windows = np.int(xspan / nx_pix_per_step) - 1
     ny_windows = np.int(yspan / ny_pix_per_step) - 1
     # Initialize a list to append window positions to
-    window_list = []
+    windows = np.zeros((nx_windows * ny_windows, 4), dtype=np.uint32)
+    invalid_win = []
 
     for ys in range(ny_windows):
         for xs in range(nx_windows):
@@ -162,14 +194,17 @@ def slide_window(img, x_start_stop=None, y_start_stop=None,
             starty = ys * ny_pix_per_step + y_start_stop[0]
             endy = starty + xy_window[1]
 
-            window_list.append(((startx, starty), (endx, endy)))
+            if endx < img.shape[1] and endy < img.shape[0]:
+                windows[ys * nx_windows + xs] = [startx, starty, endx, endy]
+            else:
+                invalid_win.append(ys * nx_windows + xs)
 
-    return window_list
+    return np.delete(windows, invalid_win, 0)
 
 
 # http://www.pyimagesearch.com/2015/02/16/faster-non-maximum-suppression-python/
 # Malisiewicz et al.
-def non_max_suppression_fast(boxes, overlapThresh):
+def non_max_suppression_fast(boxes, overlap_thresh):
     # if there are no boxes, return an empty list
     if len(boxes) == 0:
         return []
@@ -177,7 +212,7 @@ def non_max_suppression_fast(boxes, overlapThresh):
     # if the bounding boxes integers, convert them to floats --
     # this is important since we'll be doing a bunch of divisions
     if boxes.dtype.kind == "i":
-        boxes = boxes.astype("float")
+        boxes = boxes.astype(np.float32)
 
     # initialize the list of picked indexes
     pick = []
@@ -219,7 +254,7 @@ def non_max_suppression_fast(boxes, overlapThresh):
 
         # delete all indexes from the index list that have
         idxs = np.delete(idxs, np.concatenate(([last],
-                                               np.where(overlap > overlapThresh)[0])))
+                                               np.where(overlap > overlap_thresh)[0])))
 
     # return only the bounding boxes that were picked using the
     # integer data type
