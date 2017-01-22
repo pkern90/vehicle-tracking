@@ -3,10 +3,6 @@ import numpy as np
 from scipy.misc import imread
 from skimage.feature import hog
 from skimage.transform import pyramid_gaussian
-from sklearn.base import BaseEstimator
-from sklearn.base import TransformerMixin
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import StandardScaler
 
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
@@ -71,9 +67,9 @@ def hog_features(img, orient, pix_per_cell, cells_per_block, vis=False):
 
 
 def color_hist(img, bins=32, bins_range=(0, 256)):
-    hists = np.zeros((bins * img.shape[-1]))
+    hists = np.zeros((img.shape[-1], bins))
     for ch in range(img.shape[-1]):
-        hists[ch] = np.histogram(img[:, :, ch], bins=bins, range=bins_range)
+        hists[ch] = np.histogram(img[:, :, ch], bins=bins, range=bins_range)[0]
 
     return hists.ravel()
 
@@ -89,6 +85,8 @@ def convert_cspace(img, cspace='RGB'):
         img = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
     elif cspace == 'YUV':
         img = cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
+    elif cspace == 'YCrCb':
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2YCrCb)
     elif cspace == 'LAB':
         img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
     elif cspace == 'GRAY':
@@ -107,44 +105,6 @@ def hog_feature_size(image, pixels_per_cell, cells_per_block, orient):
     return n_blocks ** 2 * cells_per_block ** 2 * orient
 
 
-# def extract_features(images, cspace='RGB', spatial_size=(32, 32), hist_bins=32, hist_range=(0, 256), orient=9,
-#                      pix_per_cell=8, cells_per_block=2, hog_channel=0, normalize=True, pca=None):
-#     spatials = np.zeros((len(images), spatial_size[0] * spatial_size[1] * 3))
-#     hists = np.zeros((len(images), hist_bins * 3))
-#     hogs = np.zeros((len(images), hog_feature_size(images[0], pix_per_cell, cells_per_block, orient)))
-#
-#     for i, img in enumerate(images):
-#         feature_image = convert_cspace(img, cspace)
-#
-#         spatials[i] = bin_spatial(feature_image, size=spatial_size)
-#         hists[i] = color_hist(feature_image, bins=hist_bins, bins_range=hist_range)
-#         hogs[i] = hog_features(feature_image[:, :, hog_channel], orient, pix_per_cell, cells_per_block, vis=False)
-#
-#     if normalize:
-#         spatials = StandardScaler().fit_transform(spatials)
-#         hists = StandardScaler().fit_transform(hists)
-#         hogs = StandardScaler().fit_transform(hogs)
-#
-#     if pca and type(pca) is int:
-#         pca_spatials = PCA(n_components=pca)
-#         spatials = pca_spatials.fit_transform(spatials)
-#         pca_hists = PCA(n_components=pca)
-#         hists = pca_hists.fit_transform(hists)
-#         pca_hogs = PCA(n_components=pca)
-#         hogs = pca_hogs.fit_transform(hogs)
-#
-#         features = np.concatenate((spatials, hists, hogs), axis=1)
-#         return features, (pca_spatials, pca_hists, pca_hogs)
-#
-#     elif pca and (type(pca) is list or type(pca) is tuple):
-#         spatials = pca[0].transform(spatials)
-#         hists = pca[1].transform(hists)
-#         hogs = pca[2].transform(hogs)
-#
-#     features = np.concatenate((spatials, hists, hogs), axis=1)
-#     return features
-#
-
 def load_and_resize_images(paths, resize):
     images = np.zeros((len(paths), *resize, 3), dtype=np.uint8)
     for i, path in enumerate(paths):
@@ -153,9 +113,6 @@ def load_and_resize_images(paths, resize):
         images[i] = img
 
     return images
-
-
-
 
 
 def slide_window(img, x_start_stop=None, y_start_stop=None,
@@ -281,10 +238,10 @@ def center_points(boxes):
     y1 = boxes[:, 1]
     x2 = boxes[:, 2]
     y2 = boxes[:, 3]
-    width = x2-x1
-    height = y2-y1
-    x = x1 + width//2
-    y = y1 + height//2
+    width = x2 - x1
+    height = y2 - y1
+    x = x1 + width // 2
+    y = y1 + height // 2
 
     return np.stack((x, y)).T
 
@@ -321,9 +278,10 @@ def detect_cars(img, clf):
     detection_confidence = None
 
     pyramid = pyramid_gaussian(img, downscale=2, max_layer=max_pyramid_layer)
+    win_cnt = 0
     for scale, img_scaled in enumerate(pyramid):
         img_scaled = (img_scaled * 255).astype(np.uint8)
-        #img_scaled = convert_cspace(img_scaled, cspace)
+        # img_scaled = convert_cspace(img_scaled, cspace)
 
         # check if search area is smaller then window.
         scale_factor = 2 * scale if scale > 0 else 1
@@ -335,19 +293,20 @@ def detect_cars(img, clf):
 
         windows = slide_window(img_scaled, y_start_stop=cur_y_start_stop, xy_window=xy_window,
                                stride=stride)
-
+        win_cnt += len(windows)
         samples = cut_out_windows(img_scaled, windows)
 
-        features = clf.named_steps['feature_extractor'].transform(samples)
-        prediction = clf.named_steps['clf'].decision_function(features)
-        most_likely = prediction > -.2
-        windows = windows[most_likely]
+        # features = clf.named_steps['feature_extractor'].transform(samples)
+        # prediction = clf.named_steps['clf'].decision_function(features)
+        # most_likely = prediction > -.2
+        # windows = windows[most_likely]
 
         windows *= scale_factor
         detections = np.append(detections, windows, axis=0)
-        if detection_confidence is None:
-            detection_confidence = prediction[most_likely]
-        else:
-            detection_confidence = np.append(detection_confidence, prediction[most_likely], axis=0)
+        # if detection_confidence is None:
+        #     detection_confidence = prediction[most_likely]
+        # else:
+        #     detection_confidence = np.append(detection_confidence, prediction[most_likely], axis=0)
 
+    print(win_cnt)
     return detections, detection_confidence

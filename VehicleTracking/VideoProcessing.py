@@ -12,14 +12,14 @@ VIDEOS = ["../videos/project_video.mp4",
           "../videos/project_video_short.mp4",
           "../videos/challenge_video.mp4",
           "../videos/harder_challenge_video.mp4"]
-SELECTED_VIDEO = 0
+SELECTED_VIDEO = 1
 
 
 if __name__ == '__main__':
-    with open('../models/svm_hnm.p', 'rb') as f:
-        clf = pickle.load(f)
+    # with open('../models/svm_hnm.p', 'rb') as f:
+    #     clf = pickle.load(f)
 
-    detector = CarDetector(clf)
+    detector = CarDetector(None)
 
     clip1 = VideoFileClip(VIDEOS[SELECTED_VIDEO])
     project_clip = clip1.fl_image(detector.process_frame)
