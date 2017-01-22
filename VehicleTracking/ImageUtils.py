@@ -1,7 +1,11 @@
 import cv2
 import numpy as np
+from scipy.misc import imread
 from skimage.feature import hog
-from sklearn.decomposition import PCA
+from skimage.transform import pyramid_gaussian
+from sklearn.base import BaseEstimator
+from sklearn.base import TransformerMixin
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
 
 
@@ -67,12 +71,11 @@ def hog_features(img, orient, pix_per_cell, cells_per_block, vis=False):
 
 
 def color_hist(img, bins=32, bins_range=(0, 256)):
-    channel1_hist = np.histogram(img[:, :, 0], bins=bins, range=bins_range)
-    channel2_hist = np.histogram(img[:, :, 1], bins=bins, range=bins_range)
-    channel3_hist = np.histogram(img[:, :, 2], bins=bins, range=bins_range)
+    hists = np.zeros((bins * img.shape[-1]))
+    for ch in range(img.shape[-1]):
+        hists[ch] = np.histogram(img[:, :, ch], bins=bins, range=bins_range)
 
-    hist_features = np.concatenate((channel1_hist[0], channel2_hist[0], channel3_hist[0]))
-    return hist_features
+    return hists.ravel()
 
 
 def convert_cspace(img, cspace='RGB'):
@@ -89,7 +92,7 @@ def convert_cspace(img, cspace='RGB'):
     elif cspace == 'LAB':
         img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
     elif cspace == 'GRAY':
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        img = np.expand_dims(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY), axis=-1)
     else:
         raise ValueError('Unknown color space. Please choose one of RGB, HSV, LUV, HLS, YUV, LAB or GRAY')
 
@@ -142,19 +145,17 @@ def hog_feature_size(image, pixels_per_cell, cells_per_block, orient):
 #     return features
 #
 
-def extract_features(images, cspace='RGB', orient=9, pix_per_cell=8, cells_per_block=2, normalize=True):
+def load_and_resize_images(paths, resize):
+    images = np.zeros((len(paths), *resize, 3), dtype=np.uint8)
+    for i, path in enumerate(paths):
+        img = imread(path)
+        img = cv2.resize(img, resize[::-1])
+        images[i] = img
 
-    hogs = np.zeros((len(images), 3 * hog_feature_size(images[0], pix_per_cell, cells_per_block, orient)))
+    return images
 
-    for i, img in enumerate(images):
-        feature_image = convert_cspace(img, cspace)
 
-        hogs[i] = hog_features(feature_image, orient, pix_per_cell, cells_per_block, vis=False)
 
-    if normalize:
-        hogs = StandardScaler().fit_transform(hogs)
-
-    return hogs
 
 
 def slide_window(img, x_start_stop=None, y_start_stop=None,
@@ -194,17 +195,22 @@ def slide_window(img, x_start_stop=None, y_start_stop=None,
             starty = ys * ny_pix_per_step + y_start_stop[0]
             endy = starty + xy_window[1]
 
-            if endx < img.shape[1] and endy < img.shape[0]:
-                windows[ys * nx_windows + xs] = [startx, starty, endx, endy]
-            else:
-                invalid_win.append(ys * nx_windows + xs)
+            if endx >= img.shape[1]:
+                endx = img.shape[1] - 1
+                startx = endx - xy_window[0]
+
+            if endy >= img.shape[0]:
+                endy = img.shape[0] - 1
+                starty = endy - xy_window[1]
+
+            windows[ys * nx_windows + xs] = [startx, starty, endx, endy]
 
     return np.delete(windows, invalid_win, 0)
 
 
 # http://www.pyimagesearch.com/2015/02/16/faster-non-maximum-suppression-python/
 # Malisiewicz et al.
-def non_max_suppression_fast(boxes, overlap_thresh):
+def non_max_suppression_fast(boxes, confidence, overlap_thresh):
     # if there are no boxes, return an empty list
     if len(boxes) == 0:
         return []
@@ -226,7 +232,7 @@ def non_max_suppression_fast(boxes, overlap_thresh):
     # compute the area of the bounding boxes and sort the bounding
     # boxes by the bottom-right y-coordinate of the bounding box
     area = (x2 - x1 + 1) * (y2 - y1 + 1)
-    idxs = np.argsort(y2)
+    idxs = np.argsort(confidence)
 
     # keep looping while some indexes still remain in the indexes
     # list
@@ -259,3 +265,89 @@ def non_max_suppression_fast(boxes, overlap_thresh):
     # return only the bounding boxes that were picked using the
     # integer data type
     return boxes[pick].astype("int")
+
+
+def are_overlapping(box, other_boxes):
+    box = box.astype(np.int32)
+    other_boxes = other_boxes.astype(np.int32)
+    si = np.maximum(0, np.minimum(box[2], other_boxes[:, 2]) - np.maximum(box[0], other_boxes[:, 0])) * \
+         np.maximum(0, np.minimum(box[3], other_boxes[:, 3]) - np.maximum(box[1], other_boxes[:, 1]))
+
+    return si > 0
+
+
+def center_points(boxes):
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = boxes[:, 2]
+    y2 = boxes[:, 3]
+    width = x2-x1
+    height = y2-y1
+    x = x1 + width//2
+    y = y1 + height//2
+
+    return np.stack((x, y)).T
+
+
+def average_clusters(boxes, clusters):
+    unique_groups = np.unique(clusters)
+    avg_boxes = np.zeros((len(unique_groups), 4))
+    for i, cluster in enumerate(unique_groups):
+        avg_boxes[i] = np.mean(boxes[clusters == cluster], axis=0, keepdims=False)
+
+    return np.rint(avg_boxes).astype(np.uint32), unique_groups
+
+
+def surrounding_box(boxes, clusters):
+    unique_groups = np.unique(clusters)
+    sur_boxes = np.zeros((len(unique_groups), 4))
+    for i, cluster in enumerate(unique_groups):
+        sur_boxes[i, :2] = np.min(boxes[:, :2][clusters == cluster], axis=0, keepdims=False)
+        sur_boxes[i, 2:] = np.max(boxes[:, 2:][clusters == cluster], axis=0, keepdims=False)
+
+    return np.rint(sur_boxes).astype(np.uint32), unique_groups
+
+
+def detect_cars(img, clf):
+    y_start_stop = np.array([[400, 496],
+                             [400, 592],
+                             [368, 688]])
+
+    xy_window = (64, 64)
+    stride = (32, 32)
+    max_pyramid_layer = 2
+
+    detections = np.empty((0, 4), dtype=np.uint32)
+    detection_confidence = None
+
+    pyramid = pyramid_gaussian(img, downscale=2, max_layer=max_pyramid_layer)
+    for scale, img_scaled in enumerate(pyramid):
+        img_scaled = (img_scaled * 255).astype(np.uint8)
+        #img_scaled = convert_cspace(img_scaled, cspace)
+
+        # check if search area is smaller then window.
+        scale_factor = 2 * scale if scale > 0 else 1
+        cur_y_start_stop = y_start_stop[scale] / scale_factor
+
+        search_area_height = cur_y_start_stop[1] - cur_y_start_stop[0]
+        if search_area_height < xy_window[1] or img_scaled.shape[1] < xy_window[0]:
+            break
+
+        windows = slide_window(img_scaled, y_start_stop=cur_y_start_stop, xy_window=xy_window,
+                               stride=stride)
+
+        samples = cut_out_windows(img_scaled, windows)
+
+        features = clf.named_steps['feature_extractor'].transform(samples)
+        prediction = clf.named_steps['clf'].decision_function(features)
+        most_likely = prediction > -.2
+        windows = windows[most_likely]
+
+        windows *= scale_factor
+        detections = np.append(detections, windows, axis=0)
+        if detection_confidence is None:
+            detection_confidence = prediction[most_likely]
+        else:
+            detection_confidence = np.append(detection_confidence, prediction[most_likely], axis=0)
+
+    return detections, detection_confidence
