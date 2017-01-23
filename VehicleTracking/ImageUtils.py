@@ -32,11 +32,11 @@ def cut_out_windows(img, windows):
     height = windows[0][3] - windows[0][1]
     width = windows[0][2] - windows[0][0]
 
-    cut_outs = np.zeros((len(windows), height, width, img.shape[-1]), dtype=np.float32)
+    cut_outs = np.zeros((len(windows), height, width, img.shape[-1]), dtype=np.uint8)
     for i in range(len(windows)):
         cut_outs[i] = cut_out_window(img, windows[i])
 
-    return cut_outs.astype(np.uint8)
+    return cut_outs
 
 
 # Define a function to return HOG features and visualization
@@ -205,6 +205,7 @@ def detect_cars_multi_scale(img,
                             stride=(32, 32),
                             y_start_stops=None,
                             image_size_factors=[1],
+                            heatmap=False,
                             n_jobs=1):
     if n_jobs < 0:
         n_jobs = multiprocessing.cpu_count()
@@ -212,7 +213,7 @@ def detect_cars_multi_scale(img,
     if y_start_stops is None:
         y_start_stops = np.repeat([[0, img.shape[0] - 1]], len(image_size_factors), axis=0)
 
-    detections = Parallel(n_jobs=n_jobs)(
+    bounding_boxes = Parallel(n_jobs=n_jobs)(
         delayed(detect_cars)(
             img,
             clf,
@@ -223,7 +224,15 @@ def detect_cars_multi_scale(img,
         for cur_sizes_factors, cur_y_start_stop in
         zip(image_size_factors, y_start_stops))
 
-    return np.vstack(detections)
+    bounding_boxes = np.vstack(bounding_boxes)
+    if heatmap:
+        heat = np.zeros(img.shape[:2], dtype=np.uint8)
+        for bb in bounding_boxes:
+            heat[bb[1]:bb[3], bb[0]:bb[2]] += 1
+
+        return heat
+
+    return bounding_boxes
 
 
 def detect_cars(img, clf, xy_window, stride, cur_sizes_factors, cur_y_start_stop):
