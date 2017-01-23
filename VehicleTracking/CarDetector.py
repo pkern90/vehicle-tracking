@@ -1,14 +1,28 @@
 import numpy as np
 import scipy.cluster.hierarchy as hcluster
+from Detection import Detection
+from ImageUtils import center_points, surrounding_box
 
-from VehicleTracking.Detection import Detection
-from VehicleTracking.ImageUtils import draw_boxes, center_points, detect_cars, surrounding_box
+from ImageUtils import detect_cars_multi_scale
 
-N_FRAMES = 5
+N_FRAMES = 3
 
 
 class CarDetector:
-    def __init__(self, clf, delete_after=5, cluster_thresh=128):
+    def __init__(self,
+                 clf,
+                 delete_after=5,
+                 cluster_thresh=128,
+                 xy_window=(64, 64),
+                 stride=(32, 32),
+                 y_start_stops=None,
+                 image_size_factors=[1],
+                 n_jobs=1):
+        self.n_jobs = n_jobs
+        self.image_size_factors = image_size_factors
+        self.y_start_stops = y_start_stops
+        self.stride = stride
+        self.xy_window = xy_window
         self.clf = clf
         self.detections = []
         self.cluster_thresh = cluster_thresh
@@ -16,7 +30,8 @@ class CarDetector:
         self.frame_cnt = 0
 
     def process_frame(self, img):
-        boxes, detection_confidence = detect_cars(img, self.clf)
+        boxes = detect_cars_multi_scale(img, self.clf, self.xy_window, self.stride, self.y_start_stops,
+                                        self.image_size_factors, self.n_jobs)
 
         if len(boxes) > 0:
             centers = center_points(boxes)

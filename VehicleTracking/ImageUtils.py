@@ -1,8 +1,10 @@
+import multiprocessing
+
 import cv2
 import numpy as np
+from joblib import Parallel, delayed
 from scipy.misc import imread
 from skimage.feature import hog
-from skimage.transform import pyramid_gaussian
 
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
@@ -165,74 +167,6 @@ def slide_window(img, x_start_stop=None, y_start_stop=None,
     return np.delete(windows, invalid_win, 0)
 
 
-# http://www.pyimagesearch.com/2015/02/16/faster-non-maximum-suppression-python/
-# Malisiewicz et al.
-def non_max_suppression_fast(boxes, confidence, overlap_thresh):
-    # if there are no boxes, return an empty list
-    if len(boxes) == 0:
-        return []
-
-    # if the bounding boxes integers, convert them to floats --
-    # this is important since we'll be doing a bunch of divisions
-    if boxes.dtype.kind == "i":
-        boxes = boxes.astype(np.float32)
-
-    # initialize the list of picked indexes
-    pick = []
-
-    # grab the coordinates of the bounding boxes
-    x1 = boxes[:, 0]
-    y1 = boxes[:, 1]
-    x2 = boxes[:, 2]
-    y2 = boxes[:, 3]
-
-    # compute the area of the bounding boxes and sort the bounding
-    # boxes by the bottom-right y-coordinate of the bounding box
-    area = (x2 - x1 + 1) * (y2 - y1 + 1)
-    idxs = np.argsort(confidence)
-
-    # keep looping while some indexes still remain in the indexes
-    # list
-    while len(idxs) > 0:
-        # grab the last index in the indexes list and add the
-        # index value to the list of picked indexes
-        last = len(idxs) - 1
-        i = idxs[last]
-        pick.append(i)
-
-        # find the largest (x, y) coordinates for the start of
-        # the bounding box and the smallest (x, y) coordinates
-        # for the end of the bounding box
-        xx1 = np.maximum(x1[i], x1[idxs[:last]])
-        yy1 = np.maximum(y1[i], y1[idxs[:last]])
-        xx2 = np.minimum(x2[i], x2[idxs[:last]])
-        yy2 = np.minimum(y2[i], y2[idxs[:last]])
-
-        # compute the width and height of the bounding box
-        w = np.maximum(0, xx2 - xx1 + 1)
-        h = np.maximum(0, yy2 - yy1 + 1)
-
-        # compute the ratio of overlap
-        overlap = (w * h) / area[idxs[:last]]
-
-        # delete all indexes from the index list that have
-        idxs = np.delete(idxs, np.concatenate(([last],
-                                               np.where(overlap > overlap_thresh)[0])))
-
-    # return only the bounding boxes that were picked using the
-    # integer data type
-    return boxes[pick].astype("int")
-
-
-def are_overlapping(box, other_boxes):
-    box = box.astype(np.int32)
-    other_boxes = other_boxes.astype(np.int32)
-    si = np.maximum(0, np.minimum(box[2], other_boxes[:, 2]) - np.maximum(box[0], other_boxes[:, 0])) * \
-         np.maximum(0, np.minimum(box[3], other_boxes[:, 3]) - np.maximum(box[1], other_boxes[:, 1]))
-
-    return si > 0
-
-
 def center_points(boxes):
     x1 = boxes[:, 0]
     y1 = boxes[:, 1]
@@ -265,48 +199,88 @@ def surrounding_box(boxes, clusters):
     return np.rint(sur_boxes).astype(np.uint32), unique_groups
 
 
-def detect_cars(img, clf):
-    y_start_stop = np.array([[400, 496],
-                             [400, 592],
-                             [368, 688]])
+def detect_cars_multi_scale(img,
+                            clf,
+                            xy_window=(64, 64),
+                            stride=(32, 32),
+                            y_start_stops=None,
+                            image_size_factors=[1],
+                            n_jobs=1):
+    if n_jobs < 0:
+        n_jobs = multiprocessing.cpu_count()
 
-    xy_window = (64, 64)
-    stride = (32, 32)
-    max_pyramid_layer = 2
+    if y_start_stops is None:
+        y_start_stops = np.repeat([[0, img.shape[0] - 1]], len(image_size_factors), axis=0)
 
-    detections = np.empty((0, 4), dtype=np.uint32)
-    detection_confidence = None
+    detections = Parallel(n_jobs=n_jobs)(
+        delayed(detect_cars)(
+            img,
+            clf,
+            xy_window,
+            stride,
+            cur_sizes_factors,
+            cur_y_start_stop)
+        for cur_sizes_factors, cur_y_start_stop in
+        zip(image_size_factors, y_start_stops))
 
-    pyramid = pyramid_gaussian(img, downscale=2, max_layer=max_pyramid_layer)
-    win_cnt = 0
-    for scale, img_scaled in enumerate(pyramid):
-        img_scaled = (img_scaled * 255).astype(np.uint8)
-        # img_scaled = convert_cspace(img_scaled, cspace)
+    return np.vstack(detections)
 
-        # check if search area is smaller then window.
-        scale_factor = 2 * scale if scale > 0 else 1
-        cur_y_start_stop = y_start_stop[scale] / scale_factor
 
-        search_area_height = cur_y_start_stop[1] - cur_y_start_stop[0]
-        if search_area_height < xy_window[1] or img_scaled.shape[1] < xy_window[0]:
-            break
+def detect_cars(img, clf, xy_window, stride, cur_sizes_factors, cur_y_start_stop):
+    image_tar_size = (int(img.shape[0] * cur_sizes_factors),
+                      int(img.shape[1] * cur_sizes_factors))
 
-        windows = slide_window(img_scaled, y_start_stop=cur_y_start_stop, xy_window=xy_window,
-                               stride=stride)
-        win_cnt += len(windows)
-        samples = cut_out_windows(img_scaled, windows)
+    # open cv needs the shape in reversed order (width, height)
+    img_scaled = cv2.resize(img, image_tar_size[::-1])
 
-        # features = clf.named_steps['feature_extractor'].transform(samples)
-        # prediction = clf.named_steps['clf'].decision_function(features)
-        # most_likely = prediction > -.2
-        # windows = windows[most_likely]
+    # check if search area is smaller then window.
+    cur_y_start_stop = cur_y_start_stop * cur_sizes_factors
 
-        windows *= scale_factor
-        detections = np.append(detections, windows, axis=0)
-        # if detection_confidence is None:
-        #     detection_confidence = prediction[most_likely]
-        # else:
-        #     detection_confidence = np.append(detection_confidence, prediction[most_likely], axis=0)
+    search_area_height = cur_y_start_stop[1] - cur_y_start_stop[0]
+    if search_area_height < xy_window[1] or img_scaled.shape[1] < xy_window[0]:
+        return np.ndarray((0, 4))
 
-    print(win_cnt)
-    return detections, detection_confidence
+    windows = slide_window(img_scaled, y_start_stop=cur_y_start_stop, xy_window=xy_window,
+                           stride=stride)
+
+    samples = cut_out_windows(img_scaled, windows)
+    des_funct = clf.decision_function(samples)
+    windows = windows[(des_funct > 0.8)]
+
+    windows = (windows / cur_sizes_factors).astype(np.uint32)
+    return windows
+
+
+def are_overlapping(box, other_boxes):
+    box = box.astype(np.int32)
+    other_boxes = other_boxes.astype(np.int32)
+    si = np.maximum(0, np.minimum(box[2], other_boxes[:, 2]) - np.maximum(box[0], other_boxes[:, 0])) * \
+         np.maximum(0, np.minimum(box[3], other_boxes[:, 3]) - np.maximum(box[1], other_boxes[:, 1]))
+
+    return si > 0
+
+
+def multi_bb_intersection_over_box(box, other_boxes):
+    # determine the (x, y)-coordinates of the intersection rectangle
+    xA = np.maximum(box[0], other_boxes[:, 0])
+    yA = np.maximum(box[1], other_boxes[:, 1])
+    xB = np.minimum(box[2], other_boxes[:, 2])
+    yB = np.minimum(box[3], other_boxes[:, 3])
+
+    w = np.abs(xB - xA + 1)
+    h = np.abs(yB - yA + 1)
+
+    # compute the area of intersection rectangle
+    interArea = (w * h).astype(np.float32)
+
+    # compute the area of both the prediction and ground-truth
+    # rectangles
+    boxAArea = (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
+
+    # compute the intersection over union by taking the intersection
+    # area and dividing it by the sum of prediction + ground-truth
+    # areas - the interesection area
+    iou = interArea / boxAArea.astype(np.float32)
+    # return the intersection over union value
+    iou[~are_overlapping(box, other_boxes)] = 0
+    return iou

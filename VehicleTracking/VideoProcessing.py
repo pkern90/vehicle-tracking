@@ -1,10 +1,22 @@
-import numpy as np
-import scipy.cluster.hierarchy as hcluster
-from moviepy.video.io.VideoFileClip import VideoFileClip
 import pickle
 
-from VehicleTracking.CarDetector import CarDetector
-from VehicleTracking.ImageUtils import detect_cars, draw_boxes, center_points, surrounding_box
+import numpy as np
+from moviepy.video.io.VideoFileClip import VideoFileClip
+
+from CarDetector import CarDetector
+
+CLUSTER_THRESH = 128
+
+DELETE_AFTER = 5
+
+Y_START_STOPS = np.array([[400, 496],
+                          [400, 496],
+                          [400, 592],
+                          [368, 688]])
+IMAGE_SIZE_FACTORS = [1.5, 1, 1 / 1.5, 1 / 3]
+XY_WINDOW = (64, 64)
+STRIDE = (16, 16)
+N_JOBS = 4
 
 FRAME_SHAPE = (1280, 720)
 
@@ -14,12 +26,18 @@ VIDEOS = ["../videos/project_video.mp4",
           "../videos/harder_challenge_video.mp4"]
 SELECTED_VIDEO = 1
 
-
 if __name__ == '__main__':
-    # with open('../models/svm_hnm.p', 'rb') as f:
-    #     clf = pickle.load(f)
+    with open('../models/gridsearch.p', 'rb') as f:
+        clf = pickle.load(f)
 
-    detector = CarDetector(None)
+    detector = CarDetector(clf,
+                           delete_after=DELETE_AFTER,
+                           cluster_thresh=CLUSTER_THRESH,
+                           xy_window=XY_WINDOW,
+                           stride=STRIDE,
+                           y_start_stops=Y_START_STOPS,
+                           image_size_factors=IMAGE_SIZE_FACTORS,
+                           n_jobs=N_JOBS)
 
     clip1 = VideoFileClip(VIDEOS[SELECTED_VIDEO])
     project_clip = clip1.fl_image(detector.process_frame)

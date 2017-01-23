@@ -10,8 +10,8 @@ from sklearn.svm import LinearSVC
 from FeatureExtractionPipeline import HogExtractor, SpatialBining, ColorHistogram, ColorSpaceConverter, \
     OptionalBranch, OptionalPCA, AcceptEmptyMinMaxScaler
 
-N_JOBS = 3
-SAMPLE_SIZE = 50
+N_JOBS = 1
+SAMPLE_SIZE = 5000
 
 if __name__ == '__main__':
     np.random.seed(0)
@@ -26,9 +26,9 @@ if __name__ == '__main__':
     X_val, y_val = data['val']
 
     X_train, y_train = data['train']
-    sample = np.random.choice(len(y_train), SAMPLE_SIZE, replace=False)
-    X_train = X_train[sample]
-    y_train = y_train[sample]
+    # sample = np.random.choice(len(y_train), SAMPLE_SIZE, replace=False)
+    # X_train = X_train[sample]
+    # y_train = y_train[sample]
     print('Train size:', len(y_train))
 
     # Concat train and validation set since we will use K-fold CV
@@ -74,66 +74,95 @@ if __name__ == '__main__':
                          ('clf', clf)])
 
     # Search parameter
-    params = [{'clf__C': [1],
+    # params = [{'clf__C': [1],
+    #
+    #            'features__sb__sb_optional__use': [True],
+    #            'features__sb__sb_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
+    #            'features__sb__spatial_bining__bins': [32],
+    #
+    #            'features__chist__chist_optional__use': [True],
+    #            'features__chist__chist_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
+    #            'features__chist__color_histogram__bins': [32],
+    #            'features__chist__chist_pca__n_components': [None, 96],
+    #
+    #            'features__hog__hog_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
+    #            'features__hog__hog_extractor__orient': [9, 12, 18],
+    #            'features__hog__hog_extractor__pix_per_cell': [8],
+    #            'features__hog__hog_extractor__cells_per_block': [2, 3],
+    #            'features__hog__hog_pca__n_components': [None, 96]},
+    #
+    #           {'clf__C': [1],
+    #
+    #            'features__sb__sb_optional__use': [False],
+    #
+    #            'features__chist__chist_optional__use': [True],
+    #            'features__chist__chist_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
+    #            'features__chist__color_histogram__bins': [32],
+    #            'features__chist__chist_pca__n_components': [None, 96],
+    #
+    #            'features__hog__hog_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
+    #            'features__hog__hog_extractor__orient': [9, 12, 18],
+    #            'features__hog__hog_extractor__pix_per_cell': [8],
+    #            'features__hog__hog_extractor__cells_per_block': [2, 3],
+    #            'features__hog__hog_pca__n_components': [None, 96]},
+    #
+    #           {'clf__C': [1],
+    #
+    #            'features__sb__sb_optional__use': [True],
+    #            'features__sb__sb_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
+    #            'features__sb__spatial_bining__bins': [32],
+    #
+    #            'features__chist__chist_optional__use': [False],
+    #
+    #            'features__hog__hog_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
+    #            'features__hog__hog_extractor__orient': [9, 12, 18],
+    #            'features__hog__hog_extractor__pix_per_cell': [8],
+    #            'features__hog__hog_extractor__cells_per_block': [2, 3],
+    #            'features__hog__hog_pca__n_components': [None, 96]},
+    #
+    #           {'clf__C': [1],
+    #
+    #            'features__sb__sb_optional__use': [False],
+    #
+    #            'features__chist__chist_optional__use': [False],
+    #
+    #            'features__hog__hog_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
+    #            'features__hog__hog_extractor__orient': [9, 12, 18],
+    #            'features__hog__hog_extractor__pix_per_cell': [8],
+    #            'features__hog__hog_extractor__cells_per_block': [2, 3],
+    #            'features__hog__hog_pca__n_components': [None, 96]}
+    #           ]
 
-               'features__sb__sb_optional__use': [True],
-               'features__sb__sb_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
-               'features__sb__spatial_bining__bins': [32],
+    # Keep best params from feature extraction grid search and vary C
+    # params = {'clf__C': [1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10],
+    #           'features__chist__chist_csc__cspace': ['HLS'],
+    #           'features__chist__chist_optional__use': [True],
+    #           'features__chist__chist_pca__n_components': [None],
+    #           'features__chist__color_histogram__bins': [32],
+    #           'features__hog__hog_csc__cspace': ['LAB'],
+    #           'features__hog__hog_extractor__cells_per_block': [2],
+    #           'features__hog__hog_extractor__orient': [18],
+    #           'features__hog__hog_extractor__pix_per_cell': [8],
+    #           'features__hog__hog_pca__n_components': [None],
+    #           'features__sb__sb_csc__cspace': ['LAB'],
+    #           'features__sb__sb_optional__use': [True],
+    #           'features__sb__spatial_bining__bins': [32]}
 
-               'features__chist__chist_optional__use': [True],
-               'features__chist__chist_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
-               'features__chist__color_histogram__bins': [32],
-               'features__chist__chist_pca__n_components': [None, 96],
+    params = {'clf__C': [1],
+              'features__chist__chist_csc__cspace': ['HLS'],
+              'features__chist__chist_optional__use': [True],
+              'features__chist__chist_pca__n_components': [None],
+              'features__chist__color_histogram__bins': [32],
+              'features__hog__hog_csc__cspace': ['LAB'],
+              'features__hog__hog_extractor__cells_per_block': [2],
+              'features__hog__hog_extractor__orient': [18],
+              'features__hog__hog_extractor__pix_per_cell': [8],
+              'features__hog__hog_pca__n_components': [None],
+              'features__sb__sb_csc__cspace': ['LAB'],
+              'features__sb__sb_optional__use': [True],
+              'features__sb__spatial_bining__bins': [32]}
 
-               'features__hog__hog_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
-               'features__hog__hog_extractor__orient': [9, 12, 18],
-               'features__hog__hog_extractor__pix_per_cell': [8],
-               'features__hog__hog_extractor__cells_per_block': [2, 3],
-               'features__hog__hog_pca__n_components': [None, 96]},
-
-              {'clf__C': [1],
-
-               'features__sb__sb_optional__use': [False],
-
-               'features__chist__chist_optional__use': [True],
-               'features__chist__chist_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
-               'features__chist__color_histogram__bins': [32],
-               'features__chist__chist_pca__n_components': [None, 96],
-
-               'features__hog__hog_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
-               'features__hog__hog_extractor__orient': [9, 12, 18],
-               'features__hog__hog_extractor__pix_per_cell': [8],
-               'features__hog__hog_extractor__cells_per_block': [2, 3],
-               'features__hog__hog_pca__n_components': [None, 96]},
-
-              {'clf__C': [1],
-
-               'features__sb__sb_optional__use': [True],
-               'features__sb__sb_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
-               'features__sb__spatial_bining__bins': [32],
-
-               'features__chist__chist_optional__use': [False],
-
-               'features__hog__hog_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
-               'features__hog__hog_extractor__orient': [9, 12, 18],
-               'features__hog__hog_extractor__pix_per_cell': [8],
-               'features__hog__hog_extractor__cells_per_block': [2, 3],
-               'features__hog__hog_pca__n_components': [None, 96]},
-
-              {'clf__C': [1],
-
-               'features__sb__sb_optional__use': [False],
-
-               'features__chist__chist_optional__use': [False],
-
-               'features__hog__hog_csc__cspace': ['RGB', 'HLS', 'YCrCb', 'LAB'],
-               'features__hog__hog_extractor__orient': [9, 12, 18],
-               'features__hog__hog_extractor__pix_per_cell': [8],
-               'features__hog__hog_extractor__cells_per_block': [2, 3],
-               'features__hog__hog_pca__n_components': [None, 96]}
-              ]
-
-    cls = GridSearchCV(pipeline, params, n_jobs=3, verbose=3, scoring='roc_auc')
+    cls = GridSearchCV(pipeline, params, n_jobs=N_JOBS, verbose=3, scoring='roc_auc')
 
     print('Begin training')
     t = time.time()
@@ -141,13 +170,14 @@ if __name__ == '__main__':
     t2 = time.time()
     print('Finished training after ', t2 - t, ' seconds')
 
-    with open('svm_best.p', 'wb') as f:
+    with open('../models/svm_best_all_train.p', 'wb') as f:
         pickle.dump(cls.best_estimator_, f)
 
-    with open('gridsearch.p', 'wb') as f:
+    with open('../models/gridsearch_all_train.p', 'wb') as f:
         pickle.dump(cls, f)
 
     print('Best params: ', cls.best_params_)
+    print('Best auc roc score: ', cls.best_score_)
     print('Train Accuracy of SVC = ', cls.best_estimator_.score(X_train, y_train))
     print('Validation Accuracy of SVC = ', cls.best_estimator_.score(X_val, y_val))
 

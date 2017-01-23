@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from VehicleTracking.ImageUtils import center_points
+from ImageUtils import center_points
 
 
 class Detection:
