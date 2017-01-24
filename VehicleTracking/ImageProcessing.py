@@ -37,8 +37,9 @@ if __name__ == '__main__':
             cars = ((cars.astype(np.float32) / cars.max()) * 255).astype(np.uint8)
 
             blobs = blob_doh(cars, num_sigma=5, min_sigma=1, max_sigma=255, threshold=.005)
-        cars = np.stack([cars, np.zeros_like(cars), np.zeros_like(cars)], axis=2)
 
+        plt.imsave('../test_images/heatmap%s.jpg' % (i), cars)
+        cars = np.stack([cars, np.zeros_like(cars), np.zeros_like(cars)], axis=2)
         cars = cv2.resize(cars, (426, 240))
         img[:240, 1280-426:1280] = cars
 

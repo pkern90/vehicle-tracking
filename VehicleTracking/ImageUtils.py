@@ -254,7 +254,7 @@ def detect_cars(img, clf, xy_window, stride, cur_sizes_factors, cur_y_start_stop
 
     samples = cut_out_windows(img_scaled, windows)
     des_funct = clf.decision_function(samples)
-    windows = windows[(des_funct > 0.8)]
+    windows = windows[(des_funct > 0)]
 
     windows = (windows / cur_sizes_factors).astype(np.uint32)
     return windows

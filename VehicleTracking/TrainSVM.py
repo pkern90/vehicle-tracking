@@ -6,6 +6,7 @@ from sklearn.metrics import classification_report
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.svm import LinearSVC
+from sklearn.utils import shuffle
 
 from FeatureExtractionPipeline import HogExtractor, SpatialBining, ColorHistogram, ColorSpaceConverter, \
     OptionalBranch, OptionalPCA, AcceptEmptyMinMaxScaler
@@ -19,23 +20,24 @@ if __name__ == '__main__':
     with open('../data/data.p', 'rb') as f:
         data = pickle.load(f)
 
-    # with open('../data/data_hnm.p', 'rb') as f:
-    #     data_hnm = pickle.load(f)
-
-    # X_train, y_train = data_hnm
-    X_val, y_val = data['val']
+    with open('../data/data_hnm.p', 'rb') as f:
+        data_hnm = pickle.load(f)
 
     X_train, y_train = data['train']
+    X_hnm, y_hnm = data_hnm
+    X_val, y_val = data['val']
+
     # sample = np.random.choice(len(y_train), SAMPLE_SIZE, replace=False)
     # X_train = X_train[sample]
     # y_train = y_train[sample]
-    print('Train size:', len(y_train))
 
     # Concat train and validation set since we will use K-fold CV
-    # X_train = np.concatenate([X_train, X_val])
-    # y_train = np.concatenate([y_train, y_val])
-    #
-    # X_train, y_train = shuffle(X_train, y_train, random_state=7)
+    X_train = np.concatenate([X_train, X_hnm])
+    y_train = np.concatenate([y_train, y_hnm])
+
+    X_train, y_train = shuffle(X_train, y_train, random_state=7)
+
+    print('Train size:', len(y_train))
 
     # Pipeline setup
     sb_optional = OptionalBranch()
@@ -170,10 +172,10 @@ if __name__ == '__main__':
     t2 = time.time()
     print('Finished training after ', t2 - t, ' seconds')
 
-    with open('../models/svm_best_all_train.p', 'wb') as f:
+    with open('../models/svm_best_hnm.p', 'wb') as f:
         pickle.dump(cls.best_estimator_, f)
 
-    with open('../models/gridsearch_all_train.p', 'wb') as f:
+    with open('../models/gridsearch_hnm.p', 'wb') as f:
         pickle.dump(cls, f)
 
     print('Best params: ', cls.best_params_)
