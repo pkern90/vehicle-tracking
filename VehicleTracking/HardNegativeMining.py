@@ -6,12 +6,11 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from ImageUtils import multi_bb_intersection_over_box
+from ImageUtils import slide_window, cut_out_windows
 from scipy.misc import imread
 from skimage.transform import pyramid_gaussian
 from tqdm import tqdm
-
-from ImageUtils import draw_boxes, multi_bb_intersection_over_box
-from ImageUtils import slide_window, cut_out_windows
 
 IOU_THRESH = 0.1
 DES_FUNC_THRESH = 1

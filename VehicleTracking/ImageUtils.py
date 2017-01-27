@@ -3,8 +3,140 @@ import multiprocessing
 import cv2
 import numpy as np
 from joblib import Parallel, delayed
+from scipy import ndimage as ndi
 from scipy.misc import imread
+from skimage.feature import blob_doh
 from skimage.feature import hog
+from skimage.feature import peak_local_max
+from skimage.morphology import watershed
+
+
+def create_bb_comparision(img, heat):
+    boxes_contours = bb_by_contours(heat)
+    boxes_blob = bb_by_blob_doh(heat)
+    boxes_blob_watershed = bb_by_blob_doh_watershed(heat)
+    boxes_watershed = bb_by_watershed(heat)
+
+    img_contours = draw_boxes(img, boxes_contours, thick=3, color=(255, 0, 0))
+    img_blob = draw_boxes(img, boxes_blob, thick=3, color=(255, 0, 0))
+    img_blob_watershed = draw_boxes(img, boxes_blob_watershed, thick=3, color=(255, 0, 0))
+    img_watershed = draw_boxes(img, boxes_watershed, thick=3, color=(255, 0, 0))
+
+    cv2.putText(img_contours, "Find Contours", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), thickness=5)
+    cv2.putText(img_blob, "Blob DoH", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), thickness=5)
+    cv2.putText(img_blob_watershed, "Blob DoH + Watershed", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255),
+                thickness=5)
+    cv2.putText(img_watershed, "Watershed", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), thickness=5)
+
+    img[:360, :640] = cv2.resize(img_contours, (640, 360))
+    img[360:, :640] = cv2.resize(img_blob, (640, 360))
+    img[360:, 640:] = cv2.resize(img_blob_watershed, (640, 360))
+    img[:360, 640:] = cv2.resize(img_watershed, (640, 360))
+
+    return img
+
+
+def normalize(images, new_max=1., new_min=0., old_max=255, old_min=0, dtype=None):
+    if dtype is None:
+        dtype = images.dtype
+
+    if images.dtype.kind == 'u':
+        images = images.astype(np.float32)
+
+    return ((images - old_min) * ((new_max - new_min) / (old_max - old_min)) + new_min).astype(dtype)
+
+
+def gaussian_blur(img, kernel_size):
+    """
+    Applies a Gaussian Noise kernel
+    :param img:
+    :param kernel_size:
+    :return:
+    """
+    return cv2.GaussianBlur(img, (kernel_size, kernel_size), 0)
+
+
+def bb_by_contours(heat):
+    _, contours, _ = cv2.findContours(np.copy(heat), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    boxes = np.zeros((len(contours), 4), dtype=np.uint32)
+    for j, contour in enumerate(contours):
+        x, y, w, h = cv2.boundingRect(contour)
+        if w < 32 or h < 32:
+            continue
+
+        boxes[j] = [x, y, x + w, y + h]
+
+    return boxes
+
+
+def bb_by_blob_doh(heat):
+    try:
+        blobs = blob_doh(heat, num_sigma=4, min_sigma=1, max_sigma=255, threshold=.01)
+    except IndexError:
+        return np.empty((0, 4), dtype=np.uint32)
+
+    blobs = blobs[blobs[:, 2] > 16]
+    boxes = np.zeros((len(blobs), 4), dtype=np.uint32)
+    for i, blob in enumerate(blobs):
+        blob = np.array(blob, dtype=np.int32)
+        blob_area = np.array([max(blob[1] - blob[2], 0),
+                              max(blob[0] - blob[2], 0),
+                              min(blob[1] + blob[2], heat.shape[1] - 1),
+                              min(blob[0] + blob[2], heat.shape[0] - 1)])
+        sec = heat[blob_area[1]:blob_area[3], blob_area[0]:blob_area[2]]
+        filled = sec.nonzero()
+
+        box = np.array([[filled[1].min(), filled[0].min(), filled[1].max(), filled[0].max()]])
+
+        box[0, :2] += np.expand_dims(blob_area, axis=0)[0, :2]
+        box[0, 2:] += np.expand_dims(blob_area, axis=0)[0, :2]
+        boxes[i] = box
+
+    return boxes
+
+
+def bb_by_blob_doh_watershed(heat):
+    try:
+        blobs = blob_doh(heat, num_sigma=4, min_sigma=1, max_sigma=255, threshold=.01)
+    except IndexError:
+        return np.empty((0, 4), dtype=np.uint32)
+
+    blobs = blobs.astype(np.uint32)
+    blobs = blobs[blobs[:, 2] > 16]
+    centroids = np.zeros(heat.shape, dtype=np.bool)
+    centroids[blobs[:, 0], blobs[:, 1]] = True
+
+    markers = ndi.label(centroids)[0]
+    labels = watershed(-heat, markers, mask=heat)
+
+    boxes = np.zeros((len(np.unique(labels)) - 1, 4), dtype=np.uint32)
+    for i, label in enumerate(np.unique(labels)):
+        if label == 0:
+            continue
+        filled = np.where(labels == label)
+        boxes[i - 1] = np.array([[filled[1].min(), filled[0].min(), filled[1].max(), filled[0].max()]])
+
+    return boxes
+
+
+def bb_by_watershed(heat):
+    local_maxi = peak_local_max(heat,
+                                indices=False,
+                                footprint=np.ones((10, 10)),
+                                labels=np.copy(heat))
+
+    markers = ndi.label(local_maxi)[0]
+    labels = watershed(-heat, markers, mask=heat)
+
+    boxes = np.zeros((len(np.unique(labels)) - 1, 4), dtype=np.uint32)
+    for i, label in enumerate(np.unique(labels)):
+        if label == 0:
+            continue
+        filled = np.where(labels == label)
+        boxes[i - 1] = np.array([[filled[1].min(), filled[0].min(), filled[1].max(), filled[0].max()]])
+
+    return boxes
 
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
@@ -66,6 +198,46 @@ def hog_features(img, orient, pix_per_cell, cells_per_block, vis=False):
         return features, hog_image
     else:
         return features
+
+
+def hog_features_(img, orient, pix_per_cell, cells_per_block, vis=False):
+    if len(img.shape) == 2:
+        img = np.expand_dims(img, axis=2)
+
+    img = img.astype(np.uint8)
+
+    features = np.zeros((img.shape[2], hog_feature_size(img, pix_per_cell, cells_per_block, orient)))
+
+    win_size = (img.shape[1] // pix_per_cell * pix_per_cell, img.shape[0] // pix_per_cell * pix_per_cell)
+    block_size_px = (cells_per_block * pix_per_cell, cells_per_block * pix_per_cell)
+
+    block_stride = (8, 8)
+    deriv_aperture = 1
+    win_sigma = 1.
+    histogram_norm_type = 0
+    l2_hys_threshold = 0.2
+    gamma_correction = True
+    nlevels = 64
+
+    hog = cv2.HOGDescriptor(_winSize=win_size,
+                            _blockSize=block_size_px,
+                            _blockStride=block_stride,
+                            _cellSize=(pix_per_cell, pix_per_cell),
+                            _nbins=orient,
+                            # _derivAperture=derivAperture,
+                            # _winSigma=winSigma,
+                            #_histogramNormType=histogram_norm_type,
+                            # _L2HysThreshold=L2HysThreshold,
+                            _gammaCorrection=gamma_correction
+                            )
+
+    for ch in range(img.shape[2]):
+        hog_result = hog.compute(img[:, :, ch])[0]
+
+        features[ch] = hog_result
+
+    features = features.ravel()
+    return features
 
 
 def color_hist(img, bins=32, bins_range=(0, 256)):
@@ -202,13 +374,16 @@ def surrounding_box(boxes, clusters):
 def detect_cars_multi_scale(img,
                             clf,
                             xy_window=(64, 64),
-                            stride=(32, 32),
+                            stride=None,
                             y_start_stops=None,
                             image_size_factors=[1],
                             heatmap=False,
                             n_jobs=1):
     if n_jobs < 0:
         n_jobs = multiprocessing.cpu_count()
+
+    if stride is None:
+        stride = np.repeat([[xy_window[0], xy_window[1]]], len(image_size_factors), axis=0)
 
     if y_start_stops is None:
         y_start_stops = np.repeat([[0, img.shape[0] - 1]], len(image_size_factors), axis=0)
@@ -218,11 +393,11 @@ def detect_cars_multi_scale(img,
             img,
             clf,
             xy_window,
-            stride,
+            cur_stride,
             cur_sizes_factors,
             cur_y_start_stop)
-        for cur_sizes_factors, cur_y_start_stop in
-        zip(image_size_factors, y_start_stops))
+        for cur_stride, cur_sizes_factors, cur_y_start_stop in
+        zip(stride, image_size_factors, y_start_stops))
 
     bounding_boxes = np.vstack(bounding_boxes)
     if heatmap:

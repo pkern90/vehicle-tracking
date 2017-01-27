@@ -1,10 +1,9 @@
 import numpy as np
+from ImageUtils import convert_cspace, hog_feature_size, hog_features, bin_spatial, color_hist
 from sklearn.base import BaseEstimator
 from sklearn.base import TransformerMixin
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
-
-from ImageUtils import convert_cspace, hog_feature_size, hog_features, bin_spatial, color_hist
 
 
 class ColorSpaceConverter(BaseEstimator, TransformerMixin):

@@ -2,15 +2,13 @@ import pickle
 import time
 
 import numpy as np
+import scipy as sp
 from ImageUtils import extract_features
-from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
 from sklearn.metrics import log_loss
 from sklearn.model_selection import GridSearchCV
-from sklearn.svm import LinearSVC
 from sklearn.utils import shuffle
-import scipy as sp
 
 with open('../data/data.p', 'rb') as f:
     data = pickle.load(f)

@@ -2,14 +2,13 @@ import pickle
 import time
 
 import numpy as np
+from FeatureExtractionPipeline import HogExtractor, SpatialBining, ColorHistogram, ColorSpaceConverter, \
+    OptionalBranch, OptionalPCA, AcceptEmptyMinMaxScaler
 from sklearn.metrics import classification_report
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.svm import LinearSVC
 from sklearn.utils import shuffle
-
-from FeatureExtractionPipeline import HogExtractor, SpatialBining, ColorHistogram, ColorSpaceConverter, \
-    OptionalBranch, OptionalPCA, AcceptEmptyMinMaxScaler
 
 N_JOBS = 1
 SAMPLE_SIZE = 5000
@@ -17,7 +16,7 @@ SAMPLE_SIZE = 5000
 if __name__ == '__main__':
     np.random.seed(0)
 
-    with open('../data/data.p', 'rb') as f:
+    with open('../data/data_adj.p', 'rb') as f:
         data = pickle.load(f)
 
     with open('../data/data_hnm.p', 'rb') as f:
@@ -32,8 +31,8 @@ if __name__ == '__main__':
     # y_train = y_train[sample]
 
     # Concat train and validation set since we will use K-fold CV
-    X_train = np.concatenate([X_train, X_hnm])
-    y_train = np.concatenate([y_train, y_hnm])
+    # X_train = np.concatenate([X_train, X_hnm])
+    # y_train = np.concatenate([y_train, y_hnm])
 
     X_train, y_train = shuffle(X_train, y_train, random_state=7)
 
@@ -164,6 +163,20 @@ if __name__ == '__main__':
               'features__sb__sb_optional__use': [True],
               'features__sb__spatial_bining__bins': [32]}
 
+    # params = {'features__chist__color_histogram__bins': [32],
+    #           'features__chist__chist_optional__use': [True],
+    #           'features__sb__spatial_bining__bins': [32],
+    #           'features__hog__hog_extractor__pix_per_cell': [8],
+    #           'features__hog__hog_extractor__cells_per_block': [2],
+    #           'features__sb__sb_csc__cspace': ['LAB'],
+    #           'features__chist__chist_pca__n_components': [96],
+    #           'features__chist__chist_csc__cspace': ['YCrCb'],
+    #           'features__hog__hog_csc__cspace': ['LAB'],
+    #           'features__hog__hog_pca__n_components': [96],
+    #           'clf__C': [1],
+    #           'features__hog__hog_extractor__orient': [18],
+    #           'features__sb__sb_optional__use': [True]}
+
     cls = GridSearchCV(pipeline, params, n_jobs=N_JOBS, verbose=3, scoring='roc_auc')
 
     print('Begin training')
@@ -172,11 +185,11 @@ if __name__ == '__main__':
     t2 = time.time()
     print('Finished training after ', t2 - t, ' seconds')
 
-    with open('../models/svm_best_hnm.p', 'wb') as f:
+    with open('../models/svm_cvhog.p', 'wb') as f:
         pickle.dump(cls.best_estimator_, f)
 
-    with open('../models/gridsearch_hnm.p', 'wb') as f:
-        pickle.dump(cls, f)
+    # with open('../models/gridsearch_hnm.p', 'wb') as f:
+    #     pickle.dump(cls, f)
 
     print('Best params: ', cls.best_params_)
     print('Best auc roc score: ', cls.best_score_)

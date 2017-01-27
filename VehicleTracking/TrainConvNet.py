@@ -1,11 +1,9 @@
 import pickle
 
-from keras.layers import Conv2D, Flatten, Dense, Dropout, MaxPooling2D
-from keras.models import Sequential
 import numpy as np
-import matplotlib.pyplot as plt
-
 from ImageUtils import convert_cspace
+from keras.layers import Conv2D, Flatten, Dense, Dropout
+from keras.models import Sequential
 
 with open('../data/data.p', 'rb') as f:
     data = pickle.load(f)

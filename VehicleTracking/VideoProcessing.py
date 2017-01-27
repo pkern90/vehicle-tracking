@@ -1,9 +1,8 @@
 import pickle
 
 import numpy as np
-from moviepy.video.io.VideoFileClip import VideoFileClip
-
 from CarDetector import CarDetector
+from moviepy.video.io.VideoFileClip import VideoFileClip
 
 CLUSTER_THRESH = 128
 
@@ -13,21 +12,29 @@ Y_START_STOPS = np.array([[400, 496],
                           [400, 496],
                           [400, 592],
                           [368, 688]])
-IMAGE_SIZE_FACTORS = [1.5, 1, 1 / 1.5, 1 / 3]
+STRIDE = np.array([[24, 24],
+                   [16, 16],
+                   [16, 16],
+                   [10, 10]])
+IMAGE_SIZE_FACTORS = [1.5,
+                      1,
+                      1 / 1.5,
+                      1 / 3]
 XY_WINDOW = (64, 64)
-STRIDE = (16, 16)
+
 N_JOBS = 4
 
 FRAME_SHAPE = (1280, 720)
 
 VIDEOS = ["../videos/project_video.mp4",
           "../videos/project_video_short.mp4",
+          "../videos/project_video_very_short.mp4",
           "../videos/challenge_video.mp4",
           "../videos/harder_challenge_video.mp4"]
-SELECTED_VIDEO = 1
+SELECTED_VIDEO = 2
 
 if __name__ == '__main__':
-    with open('../models/gridsearch.p', 'rb') as f:
+    with open('../models/gridsearch_all_train.p', 'rb') as f:
         clf = pickle.load(f)
 
     detector = CarDetector(clf,
