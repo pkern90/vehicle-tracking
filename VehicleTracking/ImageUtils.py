@@ -200,36 +200,24 @@ def hog_features(img, orient, pix_per_cell, cells_per_block, vis=False):
         return features
 
 
-def hog_features_(img, orient, pix_per_cell, cells_per_block, vis=False):
+def hog_features_opencv(img, block_size_px, block_stride, pix_per_cell, orient, win_sigma, l2_hys_threshold,
+                  gamma_correction):
     if len(img.shape) == 2:
         img = np.expand_dims(img, axis=2)
 
     img = img.astype(np.uint8)
 
-    features = np.zeros((img.shape[2], hog_feature_size(img, pix_per_cell, cells_per_block, orient)))
+    cells_per_block = block_size_px[0] // pix_per_cell[0]
+    features = np.zeros((img.shape[2], hog_feature_size(img, pix_per_cell[0], cells_per_block, orient)))
 
-    win_size = (img.shape[1] // pix_per_cell * pix_per_cell, img.shape[0] // pix_per_cell * pix_per_cell)
-    block_size_px = (cells_per_block * pix_per_cell, cells_per_block * pix_per_cell)
-
-    block_stride = (8, 8)
-    deriv_aperture = 1
-    win_sigma = 1.
-    histogram_norm_type = 0
-    l2_hys_threshold = 0.2
-    gamma_correction = True
-    nlevels = 64
-
-    hog = cv2.HOGDescriptor(_winSize=win_size,
+    hog = cv2.HOGDescriptor(_winSize=(64, 64),
                             _blockSize=block_size_px,
                             _blockStride=block_stride,
-                            _cellSize=(pix_per_cell, pix_per_cell),
+                            _cellSize=pix_per_cell,
                             _nbins=orient,
-                            # _derivAperture=derivAperture,
-                            # _winSigma=winSigma,
-                            #_histogramNormType=histogram_norm_type,
-                            # _L2HysThreshold=L2HysThreshold,
-                            _gammaCorrection=gamma_correction
-                            )
+                            _winSigma=win_sigma,
+                            _L2HysThreshold=l2_hys_threshold,
+                            _gammaCorrection=gamma_correction)
 
     for ch in range(img.shape[2]):
         hog_result = hog.compute(img[:, :, ch])[0]

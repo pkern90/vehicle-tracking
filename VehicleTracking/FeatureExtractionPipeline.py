@@ -1,5 +1,5 @@
 import numpy as np
-from ImageUtils import convert_cspace, hog_feature_size, hog_features, bin_spatial, color_hist
+from ImageUtils import convert_cspace, hog_feature_size, hog_features, bin_spatial, color_hist, hog_features_opencv
 from sklearn.base import BaseEstimator
 from sklearn.base import TransformerMixin
 from sklearn.decomposition import PCA
@@ -89,6 +89,41 @@ class HogExtractor(BaseEstimator, TransformerMixin):
 
         for i, img in enumerate(images):
             hogs[i] = hog_features(img, self.orient, self.pix_per_cell, self.cells_per_block, vis=False)
+
+        return hogs
+
+
+class HogExtractorOpenCV(BaseEstimator, TransformerMixin):
+    def __init__(self, layout=None, orient=9, win_sigma=4.,
+                 l2_hys_threshold=0.2, gamma_correction=1):
+
+        self.gamma_correction = gamma_correction
+        self.l2_hys_threshold = l2_hys_threshold
+        self.win_sigma = win_sigma
+        self.orient = orient
+
+        if layout is None:
+            layout = (16, 8, 8)
+
+        self.pix_per_cell = (layout[2], layout[2])
+        self.block_stride = (layout[1], layout[1])
+        self.block_size_px = (layout[0], layout[0])
+
+
+    def fit(self, data, y=None):
+        return self
+
+    def transform(self, images):
+        if len(images[0]) == 0:
+            return images
+
+        cells_per_block = self.block_size_px[0] // self.pix_per_cell[0]
+        hogs = np.zeros(
+            (len(images), 3 * hog_feature_size(images[0], self.pix_per_cell[0], cells_per_block, self.orient)))
+
+        for i, img in enumerate(images):
+            hogs[i] = hog_features_opencv(img, self.block_size_px, self.block_stride, self.pix_per_cell, self.orient,
+                                          self.win_sigma, self.l2_hys_threshold, self.gamma_correction)
 
         return hogs
 
