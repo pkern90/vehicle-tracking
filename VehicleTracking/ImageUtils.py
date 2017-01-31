@@ -59,15 +59,15 @@ def gaussian_blur(img, kernel_size):
 def bb_by_contours(heat):
     _, contours, _ = cv2.findContours(np.copy(heat), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    boxes = np.zeros((len(contours), 4), dtype=np.uint32)
+    boxes = []
     for j, contour in enumerate(contours):
         x, y, w, h = cv2.boundingRect(contour)
         if w < 32 or h < 32:
             continue
 
-        boxes[j] = [x, y, x + w, y + h]
+        boxes.append([x, y, x + w, y + h])
 
-    return boxes
+    return np.array(boxes)
 
 
 def bb_by_blob_doh(heat):
@@ -201,7 +201,7 @@ def hog_features(img, orient, pix_per_cell, cells_per_block, vis=False):
 
 
 def hog_features_opencv(img, block_size_px, block_stride, pix_per_cell, orient, win_sigma, l2_hys_threshold,
-                  gamma_correction):
+                        gamma_correction):
     if len(img.shape) == 2:
         img = np.expand_dims(img, axis=2)
 
@@ -259,12 +259,13 @@ def convert_cspace(img, cspace='RGB'):
     return img
 
 
-def hog_feature_size(image, pixels_per_cell, cells_per_block, orient):
-    s = image.shape[0]
-    n_cells = int(np.floor(s // pixels_per_cell))
-    n_blocks = (n_cells - cells_per_block) + 1
+def hog_feature_size(img, pixels_per_cell, cells_per_block, orient):
+    n_cells_x = int(np.floor(img.shape[1] // pixels_per_cell))
+    n_cells_y = int(np.floor(img.shape[0] // pixels_per_cell))
+    n_blocks_x = (n_cells_x - cells_per_block) + 1
+    n_blocks_y = (n_cells_y - cells_per_block) + 1
 
-    return n_blocks ** 2 * cells_per_block ** 2 * orient
+    return n_blocks_y * n_blocks_x * cells_per_block * cells_per_block * orient
 
 
 def load_and_resize_images(paths, resize):
@@ -300,11 +301,10 @@ def slide_window(img, x_start_stop=None, y_start_stop=None,
     nx_pix_per_step = stride[0]
     ny_pix_per_step = stride[0]
     # Compute the number of windows in x/y
-    nx_windows = np.int(xspan / nx_pix_per_step) - 1
-    ny_windows = np.int(yspan / ny_pix_per_step) - 1
+    nx_windows = np.int((xspan - xy_window[0]) / nx_pix_per_step) + 1
+    ny_windows = np.int((yspan - xy_window[1]) / ny_pix_per_step) + 1
     # Initialize a list to append window positions to
     windows = np.zeros((nx_windows * ny_windows, 4), dtype=np.uint32)
-    invalid_win = []
 
     for ys in range(ny_windows):
         for xs in range(nx_windows):
@@ -324,7 +324,7 @@ def slide_window(img, x_start_stop=None, y_start_stop=None,
 
             windows[ys * nx_windows + xs] = [startx, starty, endx, endy]
 
-    return np.delete(windows, invalid_win, 0)
+    return windows
 
 
 def center_points(boxes):
@@ -434,25 +434,39 @@ def are_overlapping(box, other_boxes):
 
 def multi_bb_intersection_over_box(box, other_boxes):
     # determine the (x, y)-coordinates of the intersection rectangle
-    xA = np.maximum(box[0], other_boxes[:, 0])
-    yA = np.maximum(box[1], other_boxes[:, 1])
-    xB = np.minimum(box[2], other_boxes[:, 2])
-    yB = np.minimum(box[3], other_boxes[:, 3])
+    x_a = np.maximum(box[0], other_boxes[:, 0])
+    y_a = np.maximum(box[1], other_boxes[:, 1])
+    x_b = np.minimum(box[2], other_boxes[:, 2])
+    y_b = np.minimum(box[3], other_boxes[:, 3])
 
-    w = np.abs(xB - xA + 1)
-    h = np.abs(yB - yA + 1)
+    w = np.abs(x_b - x_a + 1)
+    h = np.abs(y_b - y_a + 1)
 
-    # compute the area of intersection rectangle
-    interArea = (w * h).astype(np.float32)
+    inter_area = (w * h).astype(np.float32)
+    box_a_area = (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
 
-    # compute the area of both the prediction and ground-truth
-    # rectangles
-    boxAArea = (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
+    iob = inter_area / box_a_area.astype(np.float32)
 
-    # compute the intersection over union by taking the intersection
-    # area and dividing it by the sum of prediction + ground-truth
-    # areas - the interesection area
-    iou = interArea / boxAArea.astype(np.float32)
-    # return the intersection over union value
+    iob[~are_overlapping(box, other_boxes)] = 0
+    return iob
+
+
+def multi_bb_intersection_over_union(box, other_boxes):
+    x_a = np.maximum(box[0], other_boxes[:, 0])
+    y_a = np.maximum(box[1], other_boxes[:, 1])
+    x_b = np.minimum(box[2], other_boxes[:, 2])
+    y_b = np.minimum(box[3], other_boxes[:, 3])
+
+    w = np.abs(x_b - x_a + 1)
+    h = np.abs(y_b - y_a + 1)
+
+    inter_area = (w * h).astype(np.float32)
+
+    box_a_area = (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
+    boxes_area = (other_boxes[:, 2] - other_boxes[:, 0] + 1) * (other_boxes[:, 3] - other_boxes[:, 1] + 1)
+
+    iou = inter_area / (box_a_area + boxes_area - inter_area).astype(np.float32)
+
     iou[~are_overlapping(box, other_boxes)] = 0
+
     return iou

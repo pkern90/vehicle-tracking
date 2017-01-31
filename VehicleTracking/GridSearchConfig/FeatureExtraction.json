@@ -1,0 +1,49 @@
+[
+  {
+    "clf__C": [1],
+    "features__sb__sb_optional__use": ["True"],
+    "features__sb__sb_csc__cspace": ["RGB", "HLS", "YCrCb", "LAB"],
+    "features__sb__spatial_bining__bins": [32],
+    "features__chist__chist_optional__use": ["True"],
+    "features__chist__chist_csc__cspace": ["RGB", "HLS", "YCrCb", "LAB"],
+    "features__chist__color_histogram__bins": [32],
+    "features__chist__chist_pca__n_components": ["None", 96],
+    "features__hog__hog_csc__cspace": ["RGB", "HLS", "YCrCb", "LAB"],
+    "features__hog__hog_extractor__orient": [9, 12, 18],
+    "features__hog__hog_extractor__pix_per_cell": [8],
+    "features__hog__hog_extractor__cells_per_block": [2, 3],
+    "features__hog__hog_pca__n_components": ["None", 96]
+  }, {
+  "clf__C": [1],
+  "features__sb__sb_optional__use": ["False"],
+  "features__chist__chist_optional__use": ["True"],
+  "features__chist__chist_csc__cspace": ["RGB", "HLS", "YCrCb", "LAB"],
+  "features__chist__color_histogram__bins": [32],
+  "features__chist__chist_pca__n_components": ["None", 96],
+  "features__hog__hog_csc__cspace": ["RGB", "HLS", "YCrCb", "LAB"],
+  "features__hog__hog_extractor__orient": [9, 12, 18],
+  "features__hog__hog_extractor__pix_per_cell": [8],
+  "features__hog__hog_extractor__cells_per_block": [2, 3],
+  "features__hog__hog_pca__n_components": ["None", 96]
+}, {
+  "clf__C": [1],
+  "features__sb__sb_optional__use": ["True"],
+  "features__sb__sb_csc__cspace": ["RGB", "HLS", "YCrCb", "LAB"],
+  "features__sb__spatial_bining__bins": [32],
+  "features__chist__chist_optional__use": ["False"],
+  "features__hog__hog_csc__cspace": ["RGB", "HLS", "YCrCb", "LAB"],
+  "features__hog__hog_extractor__orient": [9, 12, 18],
+  "features__hog__hog_extractor__pix_per_cell": [8],
+  "features__hog__hog_extractor__cells_per_block": [2, 3],
+  "features__hog__hog_pca__n_components": ["None", 96]
+}, {
+  "clf__C": [1],
+  "features__sb__sb_optional__use": ["False"],
+  "features__chist__chist_optional__use": ["False"],
+  "features__hog__hog_csc__cspace": ["RGB", "HLS", "YCrCb", "LAB"],
+  "features__hog__hog_extractor__orient": [9, 12, 18],
+  "features__hog__hog_extractor__pix_per_cell": [8],
+  "features__hog__hog_extractor__cells_per_block": [2, 3],
+  "features__hog__hog_pca__n_components": ["None", 96]
+}
+]

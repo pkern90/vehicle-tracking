@@ -1,25 +1,30 @@
 import pickle
 
 import numpy as np
-from CarDetector import CarDetector
 from moviepy.video.io.VideoFileClip import VideoFileClip
 
-CLUSTER_THRESH = 128
+from VehicleTracking.CarDetector import CarDetector
 
-DELETE_AFTER = 5
+DELETE_AFTER = 24
 
-Y_START_STOPS = np.array([[400, 496],
-                          [400, 496],
-                          [400, 592],
-                          [368, 688]])
-STRIDE = np.array([[24, 24],
-                   [16, 16],
-                   [16, 16],
-                   [10, 10]])
-IMAGE_SIZE_FACTORS = [1.5,
-                      1,
-                      1 / 1.5,
-                      1 / 3]
+Y_START_STOPS = np.array([
+    [400, 496],
+    [400, 496],
+    [400, 592],
+    [366, 690]
+])
+STRIDE = np.array([
+    [24, 24],
+    [16, 16],
+    [16, 16],
+    [16, 16]
+])
+IMAGE_SIZE_FACTORS = [
+    1.5,
+    1,
+    1 / 1.5,
+    1 / 3
+]
 XY_WINDOW = (64, 64)
 
 N_JOBS = 4
@@ -31,15 +36,14 @@ VIDEOS = ["../videos/project_video.mp4",
           "../videos/project_video_very_short.mp4",
           "../videos/challenge_video.mp4",
           "../videos/harder_challenge_video.mp4"]
-SELECTED_VIDEO = 2
+SELECTED_VIDEO = 0
 
 if __name__ == '__main__':
-    with open('../models/gridsearch_all_train.p', 'rb') as f:
+    with open('../models/svm_adj.p', 'rb') as f:
         clf = pickle.load(f)
 
     detector = CarDetector(clf,
                            delete_after=DELETE_AFTER,
-                           cluster_thresh=CLUSTER_THRESH,
                            xy_window=XY_WINDOW,
                            stride=STRIDE,
                            y_start_stops=Y_START_STOPS,

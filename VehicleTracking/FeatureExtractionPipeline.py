@@ -109,7 +109,6 @@ class HogExtractorOpenCV(BaseEstimator, TransformerMixin):
         self.block_stride = (layout[1], layout[1])
         self.block_size_px = (layout[0], layout[0])
 
-
     def fit(self, data, y=None):
         return self
 
