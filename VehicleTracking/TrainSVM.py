@@ -18,6 +18,11 @@ N_JOBS = 1
 SAMPLE_SIZE = 10
 
 if __name__ == '__main__':
+    """
+    Training script for a linear SVM. Uses GridSearch to find optimal hyper parameters.
+    The configurations are loaded from files inside GridSearchConfig.
+    """
+
     np.random.seed(0)
 
     with open('../data/data_adj.p', 'rb') as f:

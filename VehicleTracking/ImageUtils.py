@@ -705,7 +705,7 @@ def multi_bb_intersection_over_union(box, other_boxes):
     return iou
 
 
-def dist_metric(box, o_box):
+def relative_distance(box, o_box):
     """
     Calculates the average diagonal between the given box and each of the other boxes and
     puts it in relation to the distance of the center points.

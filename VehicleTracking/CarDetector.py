@@ -13,10 +13,14 @@ class CarDetector:
                  delete_after=5,
                  iou_thresh=0.5,
                  xy_window=(64, 64),
-                 stride=[(32, 32)],
+                 stride=None,
                  y_start_stops=None,
                  image_size_factors=[1],
                  n_jobs=1):
+
+        if stride is None:
+            stride = [(32, 32)]
+
         self.iou_thresh = iou_thresh
         self.n_jobs = n_jobs
         self.image_size_factors = image_size_factors
@@ -61,15 +65,15 @@ class CarDetector:
         used_boxes = np.zeros(len(boxes_contours), np.uint8)
         for detection in self.detections:
             if boxes_contours is not None and len(boxes_contours) > 0:
-                ious = detection.dist_metric_with(boxes_contours)
-                max_iou = ious.min()
-                argmax_iou = ious.argmin()
-                if max_iou < self.iou_thresh:
-                    if used_boxes[argmax_iou] == 1:
+                rd = detection.relative_distance_with(boxes_contours)
+                min_rd = rd.min()
+                argmin_rd = rd.argmin()
+                if min_rd < self.iou_thresh:
+                    if used_boxes[argmin_rd] == 1:
                         detection.is_hidden = True
 
-                    detection.update(boxes_contours[argmax_iou])
-                    used_boxes[argmax_iou] = 1
+                    detection.update(boxes_contours[argmin_rd])
+                    used_boxes[argmin_rd] = 1
                 else:
                     detection.update(None)
             else:
@@ -79,11 +83,11 @@ class CarDetector:
         if len(unused_boxes) > 0:
             hidden = [detection for detection in self.detections if detection.is_hidden]
             for detection in hidden:
-                ious = detection.dist_metric_with(unused_boxes)
-                max_iou = ious.min()
-                argmax_iou = ious.argmin()
-                ix = np.where(np.all(boxes_contours == unused_boxes[argmax_iou], axis=1))[0][0]
-                if max_iou < 1.5 * self.iou_thresh:
+                rd = detection.relative_distance_with(unused_boxes)
+                min_rd = rd.min()
+                argmin_rd = rd.argmin()
+                ix = np.where(np.all(boxes_contours == unused_boxes[argmin_rd], axis=1))[0][0]
+                if min_rd < 1.5 * self.iou_thresh:
                     detection.unhide(boxes_contours[ix])
                     used_boxes[ix] = 1
 

@@ -1,10 +1,9 @@
 import cv2
 import numpy as np
 from ImageUtils import center_points
-
 from ImageUtils import multi_bb_intersection_over_union
 
-from VehicleTracking.ImageUtils import dist_metric
+from VehicleTracking.ImageUtils import relative_distance
 
 CNT = 0
 
@@ -48,5 +47,5 @@ class Detection:
     def iou_with(self, boxes):
         return multi_bb_intersection_over_union(self.best_box, boxes)
 
-    def dist_metric_with(self, boxes):
-        return dist_metric(self.best_box, boxes)
+    def relative_distance_with(self, boxes):
+        return relative_distance(self.best_box, boxes)
