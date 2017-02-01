@@ -363,7 +363,7 @@ def convert_cspace(img, cspace='RGB'):
     """
     Utility function for easier color conversion. Supports the following color spaces:
 
-    RGB, HSV, LUV, HLS, YUV, LAB and GRAY'
+    RGB, HSV, LUV, HLS, YUV, LAB and GRAY
 
     :param img:
     :param cspace:
