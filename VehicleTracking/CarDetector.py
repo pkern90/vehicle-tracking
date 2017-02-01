@@ -82,12 +82,12 @@ class CarDetector:
                 ious = detection.dist_metric_with(unused_boxes)
                 max_iou = ious.min()
                 argmax_iou = ious.argmin()
-                if max_iou < self.iou_thresh:
-                    detection.update(boxes_contours[argmax_iou])
-                    detection.is_hidden = False
-                    used_boxes[argmax_iou] = 1
+                ix = np.where(np.all(boxes_contours == unused_boxes[argmax_iou], axis=1))[0][0]
+                if max_iou < 1.5 * self.iou_thresh:
+                    detection.unhide(boxes_contours[ix])
+                    used_boxes[ix] = 1
 
-        for bb in unused_boxes:
+        for bb in boxes_contours[used_boxes == 0]:
             self.detections.append(Detection(bb))
 
         keep_detections = []

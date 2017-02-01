@@ -53,7 +53,7 @@ VIDEOS = ["../videos/project_video.mp4",
           "../videos/project_video_very_short.mp4",
           "../videos/challenge_video.mp4",
           "../videos/harder_challenge_video.mp4"]
-SELECTED_VIDEO = 1
+SELECTED_VIDEO = 0
 
 if __name__ == '__main__':
     with open('../models/svm_adj.p', 'rb') as f:

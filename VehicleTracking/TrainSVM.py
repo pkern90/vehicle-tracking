@@ -35,8 +35,8 @@ if __name__ == '__main__':
     # y_train = y_train[sample]
 
     # Concat train and validation set since we will use K-fold CV
-    # X_train = np.concatenate([X_train, X_hnm])
-    # y_train = np.concatenate([y_train, y_hnm])
+    X_train = np.concatenate([X_train, X_hnm])
+    y_train = np.concatenate([y_train, y_hnm])
 
     X_train, y_train = shuffle(X_train, y_train, random_state=7)
 
@@ -91,11 +91,11 @@ if __name__ == '__main__':
     print('Finished training after ', t2 - t, ' seconds')
 
     # Save the best estimator
-    with open('../models/svm_adj.p', 'wb') as f:
+    with open('../models/svm_hnm.p', 'wb') as f:
         pickle.dump(cls.best_estimator_, f)
 
     # Also save the grid search object for analysis
-    with open('../models/gridsearch_adj.p', 'wb') as f:
+    with open('../models/gridsearch_hnm.p', 'wb') as f:
         pickle.dump(cls, f)
 
     print('Best params: ', cls.best_params_)

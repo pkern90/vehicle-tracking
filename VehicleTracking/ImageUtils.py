@@ -11,7 +11,22 @@ from skimage.feature import peak_local_max
 from skimage.morphology import watershed
 
 
-def create_bb_comparision(img, heat):
+def create_bb_comparision(heat):
+    """
+    Creates a comparison image displaying results of four different segmentation algorithms for
+    bounding boxes. The methods used include:
+
+    Watershed
+    Blob detection (Determinant of Hessian)
+    Watershed + Blob doh
+    OpenCV findContours
+
+    :param heat: one channel heat map. 0 is treated as background.
+    :return:
+    """
+
+    img = np.zeros(heat.shape)
+
     boxes_contours = bb_by_contours(heat)
     boxes_blob = bb_by_blob_doh(heat)
     boxes_blob_watershed = bb_by_blob_doh_watershed(heat)
@@ -37,6 +52,18 @@ def create_bb_comparision(img, heat):
 
 
 def normalize(images, new_max=1., new_min=0., old_max=255, old_min=0, dtype=None):
+    """
+    Normalizes images to a specified range
+
+    :param images:
+    :param new_max:
+    :param new_min:
+    :param old_max:
+    :param old_min:
+    :param dtype: dtype for the output image. If not specified, the input type will be used.
+    :return: normalized image
+    """
+
     if dtype is None:
         dtype = images.dtype
 
@@ -46,7 +73,7 @@ def normalize(images, new_max=1., new_min=0., old_max=255, old_min=0, dtype=None
     return ((images - old_min) * ((new_max - new_min) / (old_max - old_min)) + new_min).astype(dtype)
 
 
-def gaussian_blur(img, kernel_size):
+def gaussian_blur(img, kernel_size=1):
     """
     Applies a Gaussian Noise kernel
     :param img:
@@ -57,6 +84,13 @@ def gaussian_blur(img, kernel_size):
 
 
 def bb_by_contours(heat):
+    """
+    Detects bounding boxes on a heatmap. Uses OpenCV findContours internally.
+
+    :param heat: one channel heat map. 0 is treated as background.
+    :return: numpy array of bounding boxes
+    """
+
     _, contours, _ = cv2.findContours(np.copy(heat), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     boxes = []
@@ -71,6 +105,14 @@ def bb_by_contours(heat):
 
 
 def bb_by_blob_doh(heat):
+    """
+    Detects bounding boxes on a heatmap.
+    Uses Skimage blob detection (Determinant of Hessian) internally.
+
+    :param heat: one channel heat map. 0 is treated as background.
+    :return: numpy array of bounding boxes
+    """
+
     try:
         blobs = blob_doh(heat, num_sigma=4, min_sigma=1, max_sigma=255, threshold=.01)
     except IndexError:
@@ -97,6 +139,14 @@ def bb_by_blob_doh(heat):
 
 
 def bb_by_blob_doh_watershed(heat):
+    """
+    Detects bounding boxes on a heat map. Uses Skimage blob
+    detection (Determinant of Hessian) to find centroids and watershed for labeling internally.
+
+    :param heat: one channel heatmap. 0 is treated as background.
+    :return: numpy array of bounding boxes
+    """
+
     try:
         blobs = blob_doh(heat, num_sigma=4, min_sigma=1, max_sigma=255, threshold=.01)
     except IndexError:
@@ -121,6 +171,14 @@ def bb_by_blob_doh_watershed(heat):
 
 
 def bb_by_watershed(heat):
+    """
+    Detects bounding boxes on a heatmap.
+    Uses Skimage watershed internally.
+
+    :param heat: one channel heatmap. 0 is treated as background.
+    :return: numpy array of bounding boxes
+    """
+
     local_maxi = peak_local_max(heat,
                                 indices=False,
                                 footprint=np.ones((10, 10)),
@@ -140,27 +198,58 @@ def bb_by_watershed(heat):
 
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
-    # Make a copy of the image
+    """
+    Draws multiple bounding boxes onto an image.
+
+    :param img: image to draw on
+    :param bboxes: numpy array of boxes with each row containing:
+     [left_upper_x, left_upper_y, right_lower_x, right_lower_y]
+    :param color: (R, G, B)
+    :param thick: thickness in pixels
+    :return: copy of the input image with boxes drawn onto.
+    """
+
     draw_img = np.copy(img)
-    # Iterate through the bounding boxes
     for bbox in bboxes:
-        # Draw a rectangle given bbox coordinates
         cv2.rectangle(draw_img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, thick)
-    # Return the image copy with boxes drawn
+
     return draw_img
 
 
 def bin_spatial(img, size=(32, 32)):
+    """
+    Creates a feature vector of an image by spatially binning the pixels.
+
+    :param img:
+    :param size: tuple of (width, height)
+    :return: array with n elements where n = size[0] * size[1]
+    """
     features = cv2.resize(img, size).ravel()
 
     return features
 
 
 def cut_out_window(img, window):
+    """
+    Extracts a window of an image.
+
+    :param img:
+    :param window: [left_upper_x, left_upper_y, right_lower_x, right_lower_y]
+    :return:
+    """
+
     return img[window[1]:window[3], window[0]:window[2], :]
 
 
 def cut_out_windows(img, windows):
+    """
+    Extracts multiple windows from one image.
+    :param img:
+    :param windows: nx4 numpy array with n = number of windows and each window like
+        [left_upper_x, left_upper_y, right_lower_x, right_lower_y]
+    :return:
+    """
+
     height = windows[0][3] - windows[0][1]
     width = windows[0][2] - windows[0][0]
 
@@ -171,8 +260,18 @@ def cut_out_windows(img, windows):
     return cut_outs
 
 
-# Define a function to return HOG features and visualization
-def hog_features(img, orient, pix_per_cell, cells_per_block, vis=False):
+def hog_features(img, orient=9, pix_per_cell=8, cells_per_block=2, vis=False):
+    """
+    Creates a feature vector of an image through hog (histogram of oriented gradients).
+
+    :param img:
+    :param orient: number of orientation bins
+    :param pix_per_cell: Cell size in pixel. Takes a scalar value which is used as width and height
+    :param cells_per_block: Block size in cells. Takes a scalar value which is used as width and height
+    :param vis: if true also returns a image visualizing the hog
+    :return: Feature vector when viz is false. Else A tuple of (feature vector, visualization image)
+    """
+
     if len(img.shape) == 2:
         img = np.expand_dims(img, axis=2)
 
@@ -200,20 +299,36 @@ def hog_features(img, orient, pix_per_cell, cells_per_block, vis=False):
         return features
 
 
-def hog_features_opencv(img, block_size_px, block_stride, pix_per_cell, orient, win_sigma, l2_hys_threshold,
-                        gamma_correction):
+def hog_features_opencv(img, block_size_px=16, block_stride=8, pix_per_cell=8, orient=9, win_sigma=1,
+                        l2_hys_threshold=0.2, gamma_correction=True, window_size=64):
+    """
+    Creates a feature vector of an image through hog (histogram of oriented gradients). Uses OpenCV implementation.
+
+    :param img:
+    :param block_size_px: Block size in pixel. Takes a scalar value which is used as width and height
+    :param block_stride: Stride of the blocks (overlap).
+    Takes a scalar value which is used for horizontal and vertical stride
+    :param pix_per_cell: Cell size in pixel. Takes a scalar value which is used as width and height
+    :param orient: number of orientation bins
+    :param win_sigma: Gaussian blur
+    :param l2_hys_threshold:
+    :param gamma_correction: Applies gamma correction of true.
+    :param window_size: Window size in pixel. Takes a scalar value which is used as width and height
+    :return: Feature vector
+    """
+
     if len(img.shape) == 2:
         img = np.expand_dims(img, axis=2)
 
     img = img.astype(np.uint8)
 
-    cells_per_block = block_size_px[0] // pix_per_cell[0]
-    features = np.zeros((img.shape[2], hog_feature_size(img, pix_per_cell[0], cells_per_block, orient)))
+    cells_per_block = block_size_px // pix_per_cell
+    features = np.zeros((img.shape[2], hog_feature_size(img, pix_per_cell, cells_per_block, orient)))
 
-    hog = cv2.HOGDescriptor(_winSize=(64, 64),
-                            _blockSize=block_size_px,
-                            _blockStride=block_stride,
-                            _cellSize=pix_per_cell,
+    hog = cv2.HOGDescriptor(_winSize=(window_size, window_size),
+                            _blockSize=(block_size_px, block_size_px),
+                            _blockStride=(block_stride, block_stride),
+                            _cellSize=(pix_per_cell, pix_per_cell),
                             _nbins=orient,
                             _winSigma=win_sigma,
                             _L2HysThreshold=l2_hys_threshold,
@@ -229,6 +344,14 @@ def hog_features_opencv(img, block_size_px, block_stride, pix_per_cell, orient, 
 
 
 def color_hist(img, bins=32, bins_range=(0, 256)):
+    """
+    Creates a feature vector of an image based on a color histogramm
+    :param img:
+    :param bins:
+    :param bins_range:
+    :return:
+    """
+
     hists = np.zeros((img.shape[-1], bins))
     for ch in range(img.shape[-1]):
         hists[ch] = np.histogram(img[:, :, ch], bins=bins, range=bins_range)[0]
@@ -237,6 +360,16 @@ def color_hist(img, bins=32, bins_range=(0, 256)):
 
 
 def convert_cspace(img, cspace='RGB'):
+    """
+    Utility function for easier color conversion. Supports the following color spaces:
+
+    RGB, HSV, LUV, HLS, YUV, LAB and GRAY'
+
+    :param img:
+    :param cspace:
+    :return:
+    """
+
     if cspace == 'RGB':
         img = np.copy(img)
     elif cspace == 'HSV':
@@ -259,9 +392,19 @@ def convert_cspace(img, cspace='RGB'):
     return img
 
 
-def hog_feature_size(img, pixels_per_cell, cells_per_block, orient):
-    n_cells_x = int(np.floor(img.shape[1] // pixels_per_cell))
-    n_cells_y = int(np.floor(img.shape[0] // pixels_per_cell))
+def hog_feature_size(img, pix_per_cell, cells_per_block, orient):
+    """
+    Calculates the size of a hog feature vector.
+
+    :param img:
+    :param orient: number of orientation bins
+    :param pix_per_cell: Cell size in pixel. Takes a scalar value which is used as width and height
+    :param cells_per_block: Block size in cells. Takes a scalar value which is used as width and height
+    :return:
+    """
+
+    n_cells_x = int(np.floor(img.shape[1] // pix_per_cell))
+    n_cells_y = int(np.floor(img.shape[0] // pix_per_cell))
     n_blocks_x = (n_cells_x - cells_per_block) + 1
     n_blocks_y = (n_cells_y - cells_per_block) + 1
 
@@ -269,6 +412,14 @@ def hog_feature_size(img, pixels_per_cell, cells_per_block, orient):
 
 
 def load_and_resize_images(paths, resize):
+    """
+    Loads multiple images from a given list of paths and directly resizes them to save memory.
+
+    :param paths:
+    :param resize: (height, width) of the target image size
+    :return:
+    """
+
     images = np.zeros((len(paths), *resize, 3), dtype=np.uint8)
     for i, path in enumerate(paths):
         img = imread(path)
@@ -280,6 +431,17 @@ def load_and_resize_images(paths, resize):
 
 def slide_window(img, x_start_stop=None, y_start_stop=None,
                  xy_window=(64, 64), stride=(32, 32)):
+    """
+    Creates bounding boxes for every position a sliding window will have in a specified area of a given image.
+
+    :param img:
+    :param x_start_stop: limit on the x axis
+    :param y_start_stop: limits on the y axis
+    :param xy_window: size of the window in pixel
+    :param stride: stride of the window in pixel (x, y)
+    :return:
+    """
+
     # If x and/or y start/stop positions not defined, set to image size
     if y_start_stop is None:
         y_start_stop = [None, None]
@@ -299,7 +461,7 @@ def slide_window(img, x_start_stop=None, y_start_stop=None,
     yspan = y_start_stop[1] - y_start_stop[0]
     # Compute the number of pixels per step in x/y
     nx_pix_per_step = stride[0]
-    ny_pix_per_step = stride[0]
+    ny_pix_per_step = stride[1]
     # Compute the number of windows in x/y
     nx_windows = np.int((xspan - xy_window[0]) / nx_pix_per_step) + 1
     ny_windows = np.int((yspan - xy_window[1]) / ny_pix_per_step) + 1
@@ -328,6 +490,13 @@ def slide_window(img, x_start_stop=None, y_start_stop=None,
 
 
 def center_points(boxes):
+    """
+    Calculates the center coordinates of multiple bounding boxes.
+
+    :param boxes: [[left_upper_x, left_upper_y, right_lower_x, right_lower_y]]
+    :return:
+    """
+
     x1 = boxes[:, 0]
     y1 = boxes[:, 1]
     x2 = boxes[:, 2]
@@ -341,6 +510,14 @@ def center_points(boxes):
 
 
 def average_clusters(boxes, clusters):
+    """
+    Averages bounding boxes belonging to the same cluster
+
+    :param boxes: boxes to average
+    :param clusters: cluster labels for the bounding boxes
+    :return: n bounding boxes where n = the number of unique clusters
+    """
+
     unique_groups = np.unique(clusters)
     avg_boxes = np.zeros((len(unique_groups), 4))
     for i, cluster in enumerate(unique_groups):
@@ -350,6 +527,14 @@ def average_clusters(boxes, clusters):
 
 
 def surrounding_box(boxes, clusters):
+    """
+    Calculates the surrounding bounding box of bounding boxes belonging to the same cluster
+
+    :param boxes: boxes to surround
+    :param clusters: cluster labels for the bounding boxes
+    :return: n bounding boxes where n = the number of unique clusters
+    """
+
     unique_groups = np.unique(clusters)
     sur_boxes = np.zeros((len(unique_groups), 4))
     for i, cluster in enumerate(unique_groups):
@@ -367,6 +552,22 @@ def detect_cars_multi_scale(img,
                             image_size_factors=[1],
                             heatmap=False,
                             n_jobs=1):
+    """
+    Detects cars on an image and returns the corresponding bounding boxes.
+
+    :param img:
+    :param clf: binary classifier. 1 = car and 0 = non car.
+    :param xy_window: size of the window to use for sliding window.
+    Has to be the same size then the training images of the classifier
+    :param stride: stride of the sliding window. Can be different for every search area.
+    :param y_start_stops: Limits of the search area on the y axis. Can be different for each search area.
+    :param image_size_factors: Factor for scaling the image. Can be different for every search area.
+    :param heatmap: if set to true the function will return a heat map instead of the separate bounding boxes.
+    :param n_jobs: Number of parallel jobs to run. n_jobs > number of search areas won't yield any performance
+    improvements since only different search areas are processed in parallel.
+    :return:
+    """
+
     if n_jobs < 0:
         n_jobs = multiprocessing.cpu_count()
 
@@ -376,6 +577,7 @@ def detect_cars_multi_scale(img,
     if y_start_stops is None:
         y_start_stops = np.repeat([[0, img.shape[0] - 1]], len(image_size_factors), axis=0)
 
+    # use joblib to run processing in parallel
     bounding_boxes = Parallel(n_jobs=n_jobs)(
         delayed(detect_cars)(
             img,
@@ -399,13 +601,25 @@ def detect_cars_multi_scale(img,
 
 
 def detect_cars(img, clf, xy_window, stride, cur_sizes_factors, cur_y_start_stop):
+    """
+    Detects cars on an image.
+    :param img:
+    :param clf: binary classifier. 1 = car and 0 = non car.
+    :param xy_window: size of the window to use for sliding window.
+    Has to be the same size then the training images of the classifier
+    :param stride: stride of the sliding window.
+    :param cur_sizes_factors: Factor for scaling the image.
+    :param cur_y_start_stop: Limits of the search area on the y axis.
+    :return: Bounding boxes for all detected cars
+    """
+
     image_tar_size = (int(img.shape[0] * cur_sizes_factors),
                       int(img.shape[1] * cur_sizes_factors))
 
     # open cv needs the shape in reversed order (width, height)
     img_scaled = cv2.resize(img, image_tar_size[::-1])
 
-    # check if search area is smaller then window.
+    # check if search area is smaller than window.
     cur_y_start_stop = cur_y_start_stop * cur_sizes_factors
 
     search_area_height = cur_y_start_stop[1] - cur_y_start_stop[0]
@@ -416,14 +630,21 @@ def detect_cars(img, clf, xy_window, stride, cur_sizes_factors, cur_y_start_stop
                            stride=stride)
 
     samples = cut_out_windows(img_scaled, windows)
-    des_funct = clf.decision_function(samples)
-    windows = windows[(des_funct > 0)]
+    des_func = clf.decision_function(samples)
+    windows = windows[(des_func > 0)]
 
     windows = (windows / cur_sizes_factors).astype(np.uint32)
     return windows
 
 
 def are_overlapping(box, other_boxes):
+    """
+    Detects if a given bounding box is overlapping with one or multiple other bounding boxes.
+    :param box: [left_upper_x, left_upper_y, right_lower_x, right_lower_y]
+    :param other_boxes: [[left_upper_x, left_upper_y, right_lower_x, right_lower_y]]
+    :return: boolean vector indicating overlap
+    """
+
     box = box.astype(np.int32)
     other_boxes = other_boxes.astype(np.int32)
     si = np.maximum(0, np.minimum(box[2], other_boxes[:, 2]) - np.maximum(box[0], other_boxes[:, 0])) * \
@@ -433,7 +654,12 @@ def are_overlapping(box, other_boxes):
 
 
 def multi_bb_intersection_over_box(box, other_boxes):
-    # determine the (x, y)-coordinates of the intersection rectangle
+    """
+    Calculates how much the given box is overlapping with each of the other given boxes.
+    :param box: [left_upper_x, left_upper_y, right_lower_x, right_lower_y]
+    :param other_boxes: [[left_upper_x, left_upper_y, right_lower_x, right_lower_y]]
+    :return:
+    """
     x_a = np.maximum(box[0], other_boxes[:, 0])
     y_a = np.maximum(box[1], other_boxes[:, 1])
     x_b = np.minimum(box[2], other_boxes[:, 2])
@@ -452,6 +678,13 @@ def multi_bb_intersection_over_box(box, other_boxes):
 
 
 def multi_bb_intersection_over_union(box, other_boxes):
+    """
+    Calculates the intersect og union for a given box with each of the other given boxes.
+
+    :param box: [left_upper_x, left_upper_y, right_lower_x, right_lower_y]
+    :param other_boxes: [[left_upper_x, left_upper_y, right_lower_x, right_lower_y]]
+    :return:
+    """
     x_a = np.maximum(box[0], other_boxes[:, 0])
     y_a = np.maximum(box[1], other_boxes[:, 1])
     x_b = np.minimum(box[2], other_boxes[:, 2])
@@ -473,12 +706,20 @@ def multi_bb_intersection_over_union(box, other_boxes):
 
 
 def dist_metric(box, o_box):
+    """
+    Calculates the average diagonal between the given box and each of the other boxes and
+    puts it in relation to the distance of the center points.
+    :param box: [left_upper_x, left_upper_y, right_lower_x, right_lower_y]
+    :param o_box: [[left_upper_x, left_upper_y, right_lower_x, right_lower_y]]
+    :return:
+    """
+
     box = box.astype(np.float)
     o_box = o_box.astype(np.float)
-    mean_diag = (np.sqrt(box[0]**2 + box[2]**2) + np.sqrt(o_box[:, 0]**2 + o_box[:, 2]**2))/2
+    mean_diag = (np.sqrt(box[0] ** 2 + box[2] ** 2) + np.sqrt(o_box[:, 0] ** 2 + o_box[:, 2] ** 2)) / 2
 
     c_box = center_points(np.expand_dims(box, axis=0))[0]
     c_o_box = center_points(o_box)
-    dist_centers = np.sqrt(np.power(c_box[0]-c_o_box[:, 0], 2) + np.power(c_box[1]-c_o_box[:, 1], 2))
+    dist_centers = np.sqrt(np.power(c_box[0] - c_o_box[:, 0], 2) + np.power(c_box[1] - c_o_box[:, 1], 2))
 
-    return dist_centers/mean_diag
+    return dist_centers / mean_diag

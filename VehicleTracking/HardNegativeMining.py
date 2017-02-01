@@ -14,6 +14,8 @@ from tqdm import tqdm
 
 # specifies the threshold for overlap. Defines how much percent of the
 # detected boxs area can be inside a car box without counting as car.
+from VehicleTracking.ImageUtils import draw_boxes
+
 iob_thresh = 0.1
 des_func_thresh = 1
 xy_window = (64, 64)
@@ -23,13 +25,14 @@ downscale = 1.5
 # Number of frames to skip to prevent similar detections.
 skip_frames = 10
 
-image_tar_size = (720*2, 1280*2)
+image_tar_size = (int(720*1.5), int(1280*1.5))
 image_org_size = (1200, 1920)
 scale_factor = np.array(image_tar_size) / np.array(image_org_size)
 
 out_cnt = 0
 output_dir = '../data/neg_mining/'
 data_dir = '../data/udacity/object-detection-crowdai/'
+model_path = '../models/svm_adj.p'
 pattern = "*.jpg"
 
 if __name__ == '__main__':
@@ -46,7 +49,7 @@ if __name__ == '__main__':
 
     labels = pd.read_csv('%slabels.csv' % data_dir)
 
-    with open('../models/svm_best_all_train.p', 'rb') as f:
+    with open(model_path, 'rb') as f:
         clf = pickle.load(f)
 
     detections = np.empty((0, 4), dtype=np.uint32)
@@ -69,7 +72,7 @@ if __name__ == '__main__':
             img_scaled = (img_scaled * 255).astype(np.uint8)
 
             # check if search area is smaller then window.
-            y_start_stop = [img_scaled.shape[0] * 0.30, img.shape[0] * 0.93]
+            y_start_stop = [img_scaled.shape[0] * 0.45, img_scaled.shape[0] * 0.93]
             search_area_height = y_start_stop[1] - y_start_stop[0]
             if search_area_height < xy_window[1] or img_scaled.shape[1] < xy_window[0]:
                 break

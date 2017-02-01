@@ -9,7 +9,7 @@ neg_mining_paths = []
 neg_mining_dir = '../data/neg_mining/'
 pattern = "*.png"
 img_shape = (64, 64, 3)
-nb_samples = 10000
+nb_samples = -1
 
 if __name__ == '__main__':
     """

@@ -105,9 +105,9 @@ class HogExtractorOpenCV(BaseEstimator, TransformerMixin):
         if layout is None:
             layout = (16, 8, 8)
 
-        self.pix_per_cell = (layout[2], layout[2])
-        self.block_stride = (layout[1], layout[1])
-        self.block_size_px = (layout[0], layout[0])
+        self.pix_per_cell = layout[2]
+        self.block_stride = layout[1]
+        self.block_size_px = layout[0]
 
     def fit(self, data, y=None):
         return self
@@ -116,9 +116,9 @@ class HogExtractorOpenCV(BaseEstimator, TransformerMixin):
         if len(images[0]) == 0:
             return images
 
-        cells_per_block = self.block_size_px[0] // self.pix_per_cell[0]
+        cells_per_block = self.block_size_px // self.pix_per_cell
         hogs = np.zeros(
-            (len(images), 3 * hog_feature_size(images[0], self.pix_per_cell[0], cells_per_block, self.orient)))
+            (len(images), 3 * hog_feature_size(images[0], self.pix_per_cell, cells_per_block, self.orient)))
 
         for i, img in enumerate(images):
             hogs[i] = hog_features_opencv(img, self.block_size_px, self.block_stride, self.pix_per_cell, self.orient,

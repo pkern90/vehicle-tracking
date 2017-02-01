@@ -36,6 +36,10 @@ class Detection:
 
         self.age += 1
 
+    def unhide(self, box):
+        self.last_boxes.extend([box] * self.n_frames)
+        self.is_hidden = False
+
     def draw(self, img, color=(0, 0, 255), thick=6):
         if self.best_box is not None:
             cv2.rectangle(img, (self.best_box[0], self.best_box[1]), (self.best_box[2], self.best_box[3]), color, thick)
