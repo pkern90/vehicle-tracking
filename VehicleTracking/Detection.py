@@ -4,13 +4,15 @@ from ImageUtils import center_points
 
 from ImageUtils import multi_bb_intersection_over_union
 
+from VehicleTracking.ImageUtils import dist_metric
+
 CNT = 0
 
 
 class Detection:
     def __init__(self, box):
         global CNT
-
+        self.is_hidden = False
         self.last_boxes = []
         self.best_box = None
         self.frames_undetected = 0
@@ -36,11 +38,11 @@ class Detection:
 
     def draw(self, img, color=(0, 0, 255), thick=6):
         if self.best_box is not None:
-            box = self.last_boxes[-1]
-            #cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (0, 0, 255), 6)
             cv2.rectangle(img, (self.best_box[0], self.best_box[1]), (self.best_box[2], self.best_box[3]), color, thick)
         return img
 
     def iou_with(self, boxes):
         return multi_bb_intersection_over_union(self.best_box, boxes)
 
+    def dist_metric_with(self, boxes):
+        return dist_metric(self.best_box, boxes)

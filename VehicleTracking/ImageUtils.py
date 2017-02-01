@@ -470,3 +470,15 @@ def multi_bb_intersection_over_union(box, other_boxes):
     iou[~are_overlapping(box, other_boxes)] = 0
 
     return iou
+
+
+def dist_metric(box, o_box):
+    box = box.astype(np.float)
+    o_box = o_box.astype(np.float)
+    mean_diag = (np.sqrt(box[0]**2 + box[2]**2) + np.sqrt(o_box[:, 0]**2 + o_box[:, 2]**2))/2
+
+    c_box = center_points(np.expand_dims(box, axis=0))[0]
+    c_o_box = center_points(o_box)
+    dist_centers = np.sqrt(np.power(c_box[0]-c_o_box[:, 0], 2) + np.power(c_box[1]-c_o_box[:, 1], 2))
+
+    return dist_centers/mean_diag

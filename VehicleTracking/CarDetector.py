@@ -1,8 +1,6 @@
 import cv2
 import numpy as np
-
-from ImageUtils import detect_cars_multi_scale
-from ImageUtils import draw_boxes, normalize, gaussian_blur, bb_by_contours
+from ImageUtils import normalize, gaussian_blur, bb_by_contours, detect_cars_multi_scale
 
 from VehicleTracking.Detection import Detection
 
@@ -60,13 +58,16 @@ class CarDetector:
         out[360:, :640] = cv2.resize(np.stack((debug, debug, debug), axis=2), (640, 360))
 
         boxes_contours = bb_by_contours(heat_thresh)
-        used_boxes = np.zeros(len(boxes_contours))
+        used_boxes = np.zeros(len(boxes_contours), np.uint8)
         for detection in self.detections:
             if boxes_contours is not None and len(boxes_contours) > 0:
-                ious = detection.iou_with(boxes_contours)
-                max_iou = ious.max()
-                argmax_iou = ious.argmax()
-                if max_iou > self.iou_thresh:
+                ious = detection.dist_metric_with(boxes_contours)
+                max_iou = ious.min()
+                argmax_iou = ious.argmin()
+                if max_iou < self.iou_thresh:
+                    if used_boxes[argmax_iou] == 1:
+                        detection.is_hidden = True
+
                     detection.update(boxes_contours[argmax_iou])
                     used_boxes[argmax_iou] = 1
                 else:
@@ -74,15 +75,29 @@ class CarDetector:
             else:
                 detection.update(None)
 
-        for bb in boxes_contours[used_boxes == 0]:
+        unused_boxes = boxes_contours[used_boxes == 0]
+        if len(unused_boxes) > 0:
+            hidden = [detection for detection in self.detections if detection.is_hidden]
+            for detection in hidden:
+                ious = detection.dist_metric_with(unused_boxes)
+                max_iou = ious.min()
+                argmax_iou = ious.argmin()
+                if max_iou < self.iou_thresh:
+                    detection.update(boxes_contours[argmax_iou])
+                    detection.is_hidden = False
+                    used_boxes[argmax_iou] = 1
+
+        for bb in unused_boxes:
             self.detections.append(Detection(bb))
 
         keep_detections = []
         img_contours = img
+        nb_vehicles = 0
         for detection in self.detections:
             if detection.frames_undetected < self.delete_after:
                 keep_detections.append(detection)
             if len(detection.last_boxes) > 5:
+                nb_vehicles += 1
                 img_contours = detection.draw(img_contours, thick=3, color=(255, 0, 0))
 
         self.detections = keep_detections
@@ -91,4 +106,8 @@ class CarDetector:
         out[:360, 640:] = cv2.resize(img_contours, (640, 360))
 
         self.frame_cnt += 1
+
+        cv2.putText(out, 'Number of Vehicles %s' % nb_vehicles, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (255, 0, 0), 2)
+
         return out
