@@ -46,10 +46,7 @@ class SpatialBining(BaseEstimator, TransformerMixin):
 
         :param bins:
         """
-        if type(bins) in (tuple, list):
-            self.bins = bins
-        else:
-            self.bins = (bins, bins)
+        self.bins = bins
 
     def fit(self, data, y=None):
         return self
@@ -58,7 +55,7 @@ class SpatialBining(BaseEstimator, TransformerMixin):
         if len(images[0]) == 0:
             return images
 
-        spatial = np.zeros((len(images), self.bins[0] * self.bins[1] * images.shape[-1]))
+        spatial = np.zeros((len(images), self.bins * self.bins * images.shape[-1]))
 
         for i, img in enumerate(images):
             spatial[i] = bin_spatial(img, size=(self.bins, self.bins))

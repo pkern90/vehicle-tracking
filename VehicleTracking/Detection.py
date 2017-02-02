@@ -5,9 +5,6 @@ from ImageUtils import multi_bb_intersection_over_union
 
 from VehicleTracking.ImageUtils import relative_distance
 
-CNT = 0
-
-
 class Detection:
     def __init__(self, box):
         global CNT
@@ -40,8 +37,20 @@ class Detection:
         self.is_hidden = False
 
     def draw(self, img, color=(0, 0, 255), thick=6):
-        if self.best_box is not None:
-            cv2.rectangle(img, (self.best_box[0], self.best_box[1]), (self.best_box[2], self.best_box[3]), color, thick)
+        if self.best_box is None:
+            return img
+
+        box_to_draw = np.zeros(4, dtype=np.uint32)
+        if self.is_hidden:
+            w = self.best_box[2] - self.best_box[0]
+            h = self.best_box[3] - self.best_box[1]
+
+            box_to_draw[:2] = self.best_box[:2] + min(20, w//2)
+            box_to_draw[2:] = self.best_box[2:] - min(20, h//2)
+        else:
+            box_to_draw = self.best_box
+
+        cv2.rectangle(img, (box_to_draw[0], box_to_draw[1]), (box_to_draw[2], box_to_draw[3]), color, thick)
         return img
 
     def iou_with(self, boxes):
