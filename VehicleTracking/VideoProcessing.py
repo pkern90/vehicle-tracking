@@ -16,9 +16,9 @@ DELETE_AFTER = 24
 # size and will be adjusted when resizing
 Y_START_STOPS = np.array([
     [400, 496],
-    [400, 496],
-    [400, 592],
-    [366, 690]
+    [400, 520],
+    [400, 632],
+    [358, 690]
 ])
 
 # Stride to use for each search area
@@ -26,7 +26,7 @@ STRIDE = np.array([
     [24, 24],
     [16, 16],
     [16, 16],
-    [12, 12]
+    [8, 8]
 ])
 
 # Resize factor for each search area.
@@ -45,7 +45,7 @@ XY_WINDOW = (64, 64)
 # The algorithm tries to run each search area on
 # a separate cpu core. Therefore jobs > number of search areas
 # wont't yield any implements
-N_JOBS = -1
+N_JOBS = 4
 
 
 VIDEOS = ["../videos/project_video.mp4",
@@ -53,7 +53,7 @@ VIDEOS = ["../videos/project_video.mp4",
           "../videos/project_video_very_short.mp4",
           "../videos/challenge_video.mp4",
           "../videos/harder_challenge_video.mp4"]
-SELECTED_VIDEO = 1
+SELECTED_VIDEO = 0
 
 if __name__ == '__main__':
     with open('../models/svm_adj.p', 'rb') as f:

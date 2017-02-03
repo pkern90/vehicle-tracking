@@ -2,9 +2,11 @@ import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
-from ImageUtils import detect_cars_multi_scale, gaussian_blur, normalize, bb_by_contours, draw_boxes
+from ImageUtils import gaussian_blur, normalize, bb_by_contours, draw_boxes
 from scipy.misc import imread
 from tqdm import tqdm
+
+from VehicleTracking.CarDetector import detect_cars_multi_scale
 
 # Defines different search windows.
 # They are only limited by the y coordinate
@@ -12,9 +14,9 @@ from tqdm import tqdm
 # size and will be adjusted when resizing
 Y_START_STOPS = np.array([
     [400, 496],
-    [400, 496],
-    [400, 592],
-    [366, 690]
+    [400, 520],
+    [400, 632],
+    [358, 690]
 ])
 
 # Stride to use for each search area
@@ -22,7 +24,7 @@ STRIDE = np.array([
     [24, 24],
     [16, 16],
     [16, 16],
-    [12, 12]
+    [8, 8]
 ])
 
 # Resize factor for each search area.
@@ -41,7 +43,7 @@ XY_WINDOW = (64, 64)
 # The algorithm tries to run each search area on
 # a separate cpu core. Therefore jobs > number of search areas
 # wont't yield any implements
-N_JOBS = -1
+N_JOBS = 4
 
 if __name__ == '__main__':
     with open('../models/svm_adj.p', 'rb') as f:
@@ -55,7 +57,7 @@ if __name__ == '__main__':
 
         heat_thresh = np.zeros(heat.shape, dtype=np.uint8)
         heat_blur = gaussian_blur(heat, 21)
-        heat_thresh[heat_blur > 2] = 255
+        heat_thresh[heat_blur > 3] = 255
 
         boxes_contours = bb_by_contours(heat_thresh)
         img_contours = draw_boxes(img, boxes_contours, thick=3, color=(255, 0, 0))

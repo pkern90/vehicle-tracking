@@ -5,6 +5,7 @@ from ImageUtils import multi_bb_intersection_over_union
 
 from VehicleTracking.ImageUtils import relative_distance
 
+
 class Detection:
     def __init__(self, box):
         global CNT

@@ -299,6 +299,27 @@ def hog_features(img, orient=9, pix_per_cell=8, cells_per_block=2, vis=False):
         return features
 
 
+def hog_image(img, orient=9, pix_per_cell=8, cells_per_block=2):
+    if len(img.shape) == 2:
+        img = np.expand_dims(img, axis=2)
+
+    n_cells_x = int(np.floor(img.shape[1] // pix_per_cell))
+    n_cells_y = int(np.floor(img.shape[0] // pix_per_cell))
+    n_blocks_x = (n_cells_x - cells_per_block) + 1
+    n_blocks_y = (n_cells_y - cells_per_block) + 1
+
+    features = np.zeros((img.shape[2], n_blocks_y, n_blocks_x, cells_per_block, cells_per_block, orient))
+
+    for ch in range(img.shape[2]):
+        hog_result = hog(img[:, :, ch], orientations=orient, pixels_per_cell=(pix_per_cell, pix_per_cell),
+                         cells_per_block=(cells_per_block, cells_per_block), transform_sqrt=True,
+                         visualise=False, feature_vector=False)
+
+        features[ch] = hog_result
+
+    return features
+
+
 def hog_features_opencv(img, block_size_px=16, block_stride=8, pix_per_cell=8, orient=9, win_sigma=1,
                         l2_hys_threshold=0.2, gamma_correction=True, window_size=64):
     """
@@ -542,99 +563,6 @@ def surrounding_box(boxes, clusters):
         sur_boxes[i, 2:] = np.max(boxes[:, 2:][clusters == cluster], axis=0, keepdims=False)
 
     return np.rint(sur_boxes).astype(np.uint32), unique_groups
-
-
-def detect_cars_multi_scale(img,
-                            clf,
-                            xy_window=(64, 64),
-                            stride=None,
-                            y_start_stops=None,
-                            image_size_factors=[1],
-                            heatmap=False,
-                            n_jobs=1):
-    """
-    Detects cars on an image and returns the corresponding bounding boxes.
-
-    :param img:
-    :param clf: binary classifier. 1 = car and 0 = non car.
-    :param xy_window: size of the window to use for sliding window.
-    Has to be the same size then the training images of the classifier
-    :param stride: stride of the sliding window. Can be different for every search area.
-    :param y_start_stops: Limits of the search area on the y axis. Can be different for each search area.
-    :param image_size_factors: Factor for scaling the image. Can be different for every search area.
-    :param heatmap: if set to true the function will return a heat map instead of the separate bounding boxes.
-    :param n_jobs: Number of parallel jobs to run. n_jobs > number of search areas won't yield any performance
-    improvements since only different search areas are processed in parallel.
-    :return:
-    """
-
-    if n_jobs < 0:
-        n_jobs = multiprocessing.cpu_count()
-
-    if stride is None:
-        stride = np.repeat([[xy_window[0], xy_window[1]]], len(image_size_factors), axis=0)
-
-    if y_start_stops is None:
-        y_start_stops = np.repeat([[0, img.shape[0] - 1]], len(image_size_factors), axis=0)
-
-    # use joblib to run processing in parallel
-    bounding_boxes = Parallel(n_jobs=n_jobs)(
-        delayed(detect_cars)(
-            img,
-            clf,
-            xy_window,
-            cur_stride,
-            cur_sizes_factors,
-            cur_y_start_stop)
-        for cur_stride, cur_sizes_factors, cur_y_start_stop in
-        zip(stride, image_size_factors, y_start_stops))
-
-    bounding_boxes = np.vstack(bounding_boxes)
-    if heatmap:
-        heat = np.zeros(img.shape[:2], dtype=np.uint8)
-        for bb in bounding_boxes:
-            heat[bb[1]:bb[3], bb[0]:bb[2]] += 1
-
-        return heat
-
-    return bounding_boxes
-
-
-def detect_cars(img, clf, xy_window, stride, cur_sizes_factors, cur_y_start_stop):
-    """
-    Detects cars on an image.
-    :param img:
-    :param clf: binary classifier. 1 = car and 0 = non car.
-    :param xy_window: size of the window to use for sliding window.
-    Has to be the same size then the training images of the classifier
-    :param stride: stride of the sliding window.
-    :param cur_sizes_factors: Factor for scaling the image.
-    :param cur_y_start_stop: Limits of the search area on the y axis.
-    :return: Bounding boxes for all detected cars
-    """
-
-    image_tar_size = (int(img.shape[0] * cur_sizes_factors),
-                      int(img.shape[1] * cur_sizes_factors))
-
-    # open cv needs the shape in reversed order (width, height)
-    img_scaled = cv2.resize(img, image_tar_size[::-1])
-
-    # check if search area is smaller than window.
-    cur_y_start_stop = cur_y_start_stop * cur_sizes_factors
-
-    search_area_height = cur_y_start_stop[1] - cur_y_start_stop[0]
-    if search_area_height < xy_window[1] or img_scaled.shape[1] < xy_window[0]:
-        return np.ndarray((0, 4))
-
-    windows = slide_window(img_scaled, y_start_stop=cur_y_start_stop, xy_window=xy_window,
-                           stride=stride)
-
-    samples = cut_out_windows(img_scaled, windows)
-    des_func = clf.decision_function(samples)
-    windows = windows[(des_func > 0)]
-
-    windows = (windows / cur_sizes_factors).astype(np.uint32)
-    return windows
 
 
 def are_overlapping(box, other_boxes):
