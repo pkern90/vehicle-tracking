@@ -174,7 +174,7 @@ def detect_cars_multi_scale(img,
     if heatmap:
         heat = np.zeros(img.shape[:2], dtype=np.float32)
         for bb, df in zip(bounding_boxes, des_func):
-            heat[bb[1]:bb[3], bb[0]:bb[2]] += 1 #* df
+            heat[bb[1]:bb[3], bb[0]:bb[2]] += 1 * df
 
         return heat
 
