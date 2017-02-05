@@ -14,7 +14,6 @@ from tqdm import tqdm
 
 # specifies the threshold for overlap. Defines how much percent of the
 # detected boxs area can be inside a car box without counting as car.
-from VehicleTracking.ImageUtils import draw_boxes
 
 iob_thresh = 0.1
 des_func_thresh = 1

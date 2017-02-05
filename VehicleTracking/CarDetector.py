@@ -2,7 +2,7 @@ import multiprocessing
 
 import cv2
 import numpy as np
-from ImageUtils import normalize, bb_by_contours
+from ImageUtils import bb_by_contours
 from joblib import Parallel
 from joblib import delayed
 from sklearn.pipeline import Pipeline
@@ -11,7 +11,6 @@ from VehicleTracking.Detection import Detection
 from VehicleTracking.ImageUtils import cut_out_windows, hog_image, hog_feature_size, gaussian_blur
 from VehicleTracking.ImageUtils import slide_window, convert_cspace
 
-import matplotlib.pyplot as plt
 
 class CarDetector:
     def __init__(self,
@@ -25,6 +24,24 @@ class CarDetector:
                  image_size_factors=[1],
                  n_frames=1,
                  n_jobs=1):
+        """
+        Detects and tracks vehicles on a video stream.
+
+        :param clf: Classification pipeline
+        :param delete_after: Numbers of frames to wait before deleting a
+        detection object without new detections on the heatmap
+        :param dist_thresh: Threshold for relative distance to join detections
+        :param xy_window: The window size has to be the same for all
+         search areas since the classifier expects a fixed feature size.
+        :param stride: Stride to use for each search area
+        :param y_start_stops: Defines different search windows. They are only limited by the y coordinate
+        The coordinates are based on the original window size and will be adjusted when resizing
+        :param x_padding: Number of pixels (zeros) to add on each side of the x axis
+        :param image_size_factors: Resize factor for each search area.
+        :param n_frames: Number of frame for averaging the detections
+        :param n_jobs: The algorithm tries to run each search area on a separate cpu core.
+         Therefore jobs > number of search areas wont't yield any improvements
+        """
 
         if stride is None:
             stride = [(32, 32)]
@@ -44,21 +61,12 @@ class CarDetector:
         self.heatmap = None
         self.x_padding = x_padding
 
-    def _remove_outliers(self, boxes):
-        filtered_boxes = []
-        for bc in boxes:
-            w = bc[2] - bc[0]
-            h = bc[3] - bc[1]
-            if bc[1] < 450 and w > 32 and h > 32:
-                filtered_boxes.append(bc)
-            elif bc[1] > 450 and w > 64 and h > 64:
-                filtered_boxes.append(bc)
-
-        return np.array(filtered_boxes)
-
     def process_frame(self, img):
-        out = np.zeros(img.shape, dtype=np.uint8)
-
+        """
+        Processes one frame of a movie clip and draws detections on it.
+        :param img:
+        :return:
+        """
         if self.heatmap is None:
             self.heatmap = np.zeros((img.shape[0], img.shape[1], self.n_frames), dtype=np.float32)
 
@@ -74,35 +82,58 @@ class CarDetector:
         else:
             heat = np.mean(self.heatmap, axis=2)
 
-        debug = normalize(heat, new_max=255, new_min=0, dtype=np.uint8)
-        out[:360, :640] = cv2.resize(np.stack((debug, debug, debug), axis=2), (640, 360))
-
         heat_thresh = np.zeros(heat.shape, dtype=np.uint8)
         heat_thresh[heat > 2.5] = 255
-
-        debug = np.copy(heat_thresh)
-        out[360:, 640:] = cv2.resize(np.stack((debug, debug, debug), axis=2), (640, 360))
 
         boxes_contours = bb_by_contours(heat_thresh)
         boxes_contours = self._remove_outliers(boxes_contours)
 
-        used_boxes = np.zeros(len(boxes_contours), np.bool)
-        for detection in self.detections:
-            if boxes_contours is not None and len(boxes_contours) > 0:
-                rd = detection.relative_distance_with(boxes_contours)
-                min_rd = rd.min()
-                argmin_rd = rd.argmin()
-                if min_rd < self.dist_thresh:
-                    if used_boxes[argmin_rd]:
-                        detection.is_hidden = True
+        used_boxes = self._update_detections(boxes_contours)
 
-                    detection.update(boxes_contours[argmin_rd])
-                    used_boxes[argmin_rd] = True
-                else:
-                    detection.update(None)
+        self._unhide_if_applicable(boxes_contours, used_boxes)
+
+        self._create_new_detections(boxes_contours, used_boxes)
+
+        self._remove_lost_detections()
+        img = self._draw_info(img)
+        self.frame_cnt += 1
+
+        return img
+
+    def _update_detections(self, boxes_contours):
+        """
+        Updates detections with new bounding boxes.
+        :param boxes_contours:
+        :return: used bounding boxes
+        """
+        used_boxes = np.zeros(len(boxes_contours), np.bool)
+        if boxes_contours is None or len(boxes_contours) == 0:
+            for detection in self.detections:
+                detection.update(None)
+            return used_boxes
+
+        for detection in self.detections:
+            rd = detection.relative_distance_with(boxes_contours)
+            min_rd = rd.min()
+            argmin_rd = rd.argmin()
+            if min_rd < self.dist_thresh:
+                if used_boxes[argmin_rd]:
+                    detection.is_hidden = True
+
+                detection.update(boxes_contours[argmin_rd])
+                used_boxes[argmin_rd] = True
             else:
                 detection.update(None)
 
+        return used_boxes
+
+    def _unhide_if_applicable(self, boxes_contours, used_boxes):
+        """
+        Unhides detections which have a bounding box close to them.
+        :param boxes_contours:
+        :param used_boxes:
+        :return:
+        """
         unused_boxes = boxes_contours[used_boxes == False]
         if len(unused_boxes) > 0:
             hidden = [detection for detection in self.detections if detection.is_hidden]
@@ -115,33 +146,65 @@ class CarDetector:
                     detection.unhide(boxes_contours[ix])
                     used_boxes[ix] = True
 
+    def _create_new_detections(self, boxes_contours, used_boxes):
+        """
+        Creates a new detection for every unused bounding box
+        :param boxes_contours:
+        :param used_boxes:
+        :return:
+        """
         for bb in boxes_contours[used_boxes == False]:
             d = Detection(bb)
             self.detections.append(d)
 
+    def _remove_lost_detections(self, age_threshold=8):
+        """
+        Removes all detections which haven'T been updated for a while or have been hidden to quickly
+        :param age_threshold: minimum age of a detection before it is allowed to be hidden
+        """
+
         keep_detections = []
-        img_contours = img
-        self.n_vehicles = 0
         for detection in self.detections:
             if detection.frames_undetected < self.delete_after and \
-                    not (detection.is_hidden and detection.age < 8):
+                    not (detection.is_hidden and detection.age < age_threshold):
                 keep_detections.append(detection)
-
-            if len(detection.last_boxes) > 8:
-                self.n_vehicles += 1
-                img_contours = detection.draw(img_contours, thick=3, color=(255, 0, 0))
-
         self.detections = keep_detections
 
-        # img_contours = draw_boxes(img, boxes_contours, thick=3, color=(255, 0, 0))
-        out[:360, 640:] = cv2.resize(img_contours, (640, 360))
+    def _draw_info(self, img, age_threshold=8):
+        """
+        Draws the bounding boxes for all detections which are old enough
+        :param img:
+        :param age_threshold: minimum age of a detection to be drawn
+        :return: img
+        """
+        self.n_vehicles = 0
+        for detection in self.detections:
+            if len(detection.last_boxes) > age_threshold:
+                self.n_vehicles += 1
+                img = detection.draw(img, thick=3, color=(255, 0, 0))
 
-        self.frame_cnt += 1
-
-        cv2.putText(out, 'Vehicles in sight: %s' % self.n_vehicles, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1,
+        cv2.putText(img, 'Vehicles in sight: %s' % self.n_vehicles, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1,
                     (255, 0, 0), 2)
 
-        return out
+        return img
+
+    def _remove_outliers(self, boxes):
+        """
+        Removes bounding boxes which are to small
+        :param boxes:
+        :return:
+        """
+
+        filtered_boxes = []
+        for bc in boxes:
+            w = bc[2] - bc[0]
+            h = bc[3] - bc[1]
+            if bc[1] < 450 and w > 32 and h > 32:
+                filtered_boxes.append(bc)
+            elif bc[1] > 450 and w > 64 and h > 64:
+                filtered_boxes.append(bc)
+
+        return np.array(filtered_boxes)
 
 
 def detect_cars_multi_area(img,
@@ -220,7 +283,8 @@ def detect_cars(img, clf, xy_window, stride, cur_sizes_factors, cur_y_start_stop
     :param stride: stride of the sliding window.
     :param cur_sizes_factors: Factor for scaling the image.
     :param cur_y_start_stop: Limits of the search area on the y axis.
-    :return: Bounding boxes for all detected cars
+    :param cur_x_padding:
+    :return: Bounding boxes for all detected cars and also the corresponding decision function value
     """
 
     image_tar_size = (int(img.shape[0] * cur_sizes_factors),
@@ -228,56 +292,95 @@ def detect_cars(img, clf, xy_window, stride, cur_sizes_factors, cur_y_start_stop
 
     # open cv needs the shape in reversed order (width, height)
     img_scaled = cv2.resize(img, image_tar_size[::-1])
-
     # check if search area is smaller than window.
     cur_y_start_stop = (cur_y_start_stop * cur_sizes_factors).astype(np.uint32)
 
+    # if the window size is bigger than the search area return an empty array
     search_area_height = cur_y_start_stop[1] - cur_y_start_stop[0]
     if search_area_height < xy_window[1] or img_scaled.shape[1] < xy_window[0]:
         return np.ndarray((0, 4))
 
-    w = img_scaled.shape[1] + cur_x_padding * 2
-    img_with_padding = np.zeros((img_scaled.shape[0], w, 3), dtype=img_scaled.dtype)
-    img_with_padding[:, cur_x_padding:img_scaled.shape[1] + cur_x_padding] = img_scaled
-    img_scaled = img_with_padding
-
+    # Add padding (zeros) on the x axis
+    img_scaled = add_padding(img_scaled, cur_x_padding)
     windows = slide_window(img_scaled, y_start_stop=cur_y_start_stop, xy_window=xy_window,
                            stride=stride)
 
-    img_scaled_lab = convert_cspace(img_scaled, 'LAB')
-    samples_lab = cut_out_windows(img_scaled_lab, windows)
+    features = extract_features(img_scaled, clf, windows, cur_y_start_stop, xy_window, stride)
+    des_func = clf.named_steps['clf'].decision_function(features)
 
-    img_scaled_hls = convert_cspace(img_scaled, 'HLS')
-    samples_hls = cut_out_windows(img_scaled_hls, windows)
-    search_area_lab = img_scaled_lab[cur_y_start_stop[0]:cur_y_start_stop[1], :, :]
+    # windows have to be rescaled to account for the resized image
+    windows = (windows / cur_sizes_factors).astype(np.uint32)
+    windows = windows[des_func > 0]
+    windows = remove_padding_from_bb(windows, cur_x_padding)
+
+    des_func = des_func[des_func > 0]
+
+    return windows, des_func
+
+
+def extract_features(img, clf, windows, y_start_stop, xy_window, stride):
+    """
+    Creates a feature vector for all windows.
+    :param img:
+    :param clf: A sklearn pipeline trained with all the expected preprocessing steps
+    :param windows: bounding boxes for each window
+    :param y_start_stop: Limits of the search area on the y axis.
+    :param xy_window: size of the window to use for sliding window.
+    Has to be the same size then the training images of the classifier
+    :param stride:stride of the sliding window.
+    :return:
+    """
 
     transformers = {k: v for k, v in clf.named_steps['features'].transformer_list}
 
     chist_transformer = transformers['chist']
+    # remove the first two steps since they are not needed
     chist_transformer = Pipeline(chist_transformer.steps[2:])
 
     sb_transformer = transformers['sb']
+    # remove the first two steps since they are not needed
     sb_transformer = Pipeline(sb_transformer.steps[2:])
 
-    hog_vectors = get_hog_vector(search_area_lab, transformers['hog'], xy_window[0], stride)
-    sb_vectors = sb_transformer.transform(samples_lab)
-    chist_vectors = chist_transformer.transform(samples_hls)
+    img_scaled_sb = convert_cspace(img, transformers['sb'].named_steps['sb_csc'].cspace)
+    samples_sb = cut_out_windows(img_scaled_sb, windows)
 
-    features = np.concatenate((hog_vectors, chist_vectors, sb_vectors), axis=1)
+    img_scaled_chist = convert_cspace(img, transformers['chist'].named_steps['chist_csc'].cspace)
+    samples_chist = cut_out_windows(img_scaled_chist, windows)
 
-    cls = clf.named_steps['clf']
-    des_func = cls.decision_function(features)
+    img_scaled_hog = convert_cspace(img, transformers['hog'].named_steps['hog_csc'].cspace)
+    search_area_hog = img_scaled_hog[y_start_stop[0]:y_start_stop[1], :, :]
 
-    windows = (windows / cur_sizes_factors).astype(np.uint32)
+    hog_vectors = get_hog_vector(search_area_hog, transformers['hog'], xy_window[0], stride)
+    sb_vectors = sb_transformer.transform(samples_sb)
+    chist_vectors = chist_transformer.transform(samples_chist)
 
-    windows = windows[des_func > 0]
-    des_func = des_func[des_func > 0]
+    return np.concatenate((hog_vectors, chist_vectors, sb_vectors), axis=1)
 
-    windows[windows[:, 0] < cur_x_padding] = cur_x_padding
-    windows[:, 0] -= cur_x_padding
-    windows[:, 2] -= cur_x_padding
 
-    return windows, des_func
+def remove_padding_from_bb(boxes, x_padding):
+    """
+    Adjusts the bounding boxes to account for the padding added to the image.
+    :param boxes:
+    :param x_padding:
+    :return:
+    """
+    boxes[boxes[:, 0] < x_padding] = x_padding
+    boxes[:, 0] -= x_padding
+    boxes[:, 2] -= x_padding
+    return boxes
+
+
+def add_padding(img, x_padding):
+    """
+    Adds padding on the left and right of the image (all zeros).
+    :param img:
+    :param x_padding: number of pixels to add on each site
+    :return:
+    """
+    w = img.shape[1] + x_padding * 2
+    img_with_padding = np.zeros((img.shape[0], w, 3), dtype=img.dtype)
+    img_with_padding[:, x_padding:img.shape[1] + x_padding] = img
+    return img_with_padding
 
 
 def get_hog_vector(search_area, hog_transformer, win_size, stride):

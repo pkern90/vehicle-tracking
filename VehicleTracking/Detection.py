@@ -6,6 +6,8 @@ from ImageUtils import center_points, multi_bb_intersection_over_union
 
 from VehicleTracking.ImageUtils import relative_distance
 
+FRAMES_PER_SEC = 24
+
 
 class Detection:
     def __init__(self, box):
@@ -19,7 +21,6 @@ class Detection:
         self.frames_undetected = 0
         self.age = 0
         self.n_frames = 10
-        self.detection_time = time.time()
 
         self.update(box)
 
@@ -72,7 +73,7 @@ class Detection:
             box_to_draw = self.best_box
 
         cv2.rectangle(img, (box_to_draw[0], box_to_draw[1]), (box_to_draw[2], box_to_draw[3]), color, thick)
-        cv2.putText(img, '%.1fs' % (time.time() - self.detection_time),
+        cv2.putText(img, '%.1fs' % (self.age / FRAMES_PER_SEC),
                     (box_to_draw[0] + 10, box_to_draw[1] + 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     (255, 0, 0), 2)

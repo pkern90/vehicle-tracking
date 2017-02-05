@@ -3,14 +3,13 @@ import pickle
 import time
 
 import numpy as np
+from FeatureExtractionPipeline import SpatialBining, ColorHistogram, ColorSpaceConverter, \
+    OptionalBranch, OptionalPCA, AcceptEmptyMinMaxScaler
 from sklearn.metrics import classification_report
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.svm import LinearSVC
 from sklearn.utils import shuffle
-
-from FeatureExtractionPipeline import SpatialBining, ColorHistogram, ColorSpaceConverter, \
-    OptionalBranch, OptionalPCA, AcceptEmptyMinMaxScaler, HogExtractorOpenCV
 
 from VehicleTracking.FeatureExtractionPipeline import HogExtractor
 

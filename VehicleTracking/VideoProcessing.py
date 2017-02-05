@@ -13,15 +13,18 @@ DELETE_AFTER = 24
 # Number of frame for averaging the detections
 N_FRAMES = 8
 
+# Threshold for relative distance to join detections
+DIST_THRESH = 0.1
+
 # Defines different search windows.
 # They are only limited by the y coordinate
 # The coordinates are based on the original window
 # size and will be adjusted when resizing
 Y_START_STOPS = np.array([
-    [400, 400 + 96],
-    [400, 400 + 128 + 16],
-    [528 - 32, 528 + 128],
-    [400, 400 + 256],
+    [400, 496],
+    [400, 544],
+    [496, 656],
+    [400, 656],
 ])
 
 # Stride to use for each search area
@@ -40,6 +43,7 @@ IMAGE_SIZE_FACTORS = [
     1 / 1.5,
 ]
 
+# Number of pixels (zeros) to add on each side of the x axis
 X_PADDING = [
     24,
     32,
@@ -54,16 +58,15 @@ XY_WINDOW = (64, 64)
 
 # The algorithm tries to run each search area on
 # a separate cpu core. Therefore jobs > number of search areas
-# wont't yield any implements
+# wont't yield any improvements
 N_JOBS = 4
-
 
 VIDEOS = ["../videos/project_video.mp4",
           "../videos/project_video_short.mp4",
           "../videos/project_video_very_short.mp4",
           "../videos/challenge_video.mp4",
           "../videos/harder_challenge_video.mp4"]
-SELECTED_VIDEO = 0
+SELECTED_VIDEO = 3
 
 if __name__ == '__main__':
     with open('../models/svm_final.p', 'rb') as f:
@@ -76,7 +79,7 @@ if __name__ == '__main__':
                            y_start_stops=Y_START_STOPS,
                            image_size_factors=IMAGE_SIZE_FACTORS,
                            x_padding=X_PADDING,
-                           dist_thresh=0.1,
+                           dist_thresh=DIST_THRESH,
                            n_frames=N_FRAMES,
                            n_jobs=N_JOBS)
 
