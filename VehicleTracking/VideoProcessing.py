@@ -10,15 +10,18 @@ from VehicleTracking.CarDetector import CarDetector
 # the heatmap
 DELETE_AFTER = 24
 
+# Number of frame for averaging the detections
+N_FRAMES = 8
+
 # Defines different search windows.
 # They are only limited by the y coordinate
 # The coordinates are based on the original window
 # size and will be adjusted when resizing
 Y_START_STOPS = np.array([
-    [400, 496],
-    [400, 520],
-    [400, 632],
-    [358, 690]
+    [400, 400 + 96],
+    [400, 400 + 128 + 16],
+    [528 - 32, 528 + 128],
+    [400, 400 + 256],
 ])
 
 # Stride to use for each search area
@@ -26,15 +29,22 @@ STRIDE = np.array([
     [24, 24],
     [16, 16],
     [16, 16],
-    [8, 8]
+    [16, 16],
 ])
 
 # Resize factor for each search area.
 IMAGE_SIZE_FACTORS = [
     1.5,
     1,
+    1,
     1 / 1.5,
-    1 / 3
+]
+
+X_PADDING = [
+    24,
+    32,
+    32,
+    32,
 ]
 
 # The window size has to be the same for all
@@ -56,7 +66,7 @@ VIDEOS = ["../videos/project_video.mp4",
 SELECTED_VIDEO = 0
 
 if __name__ == '__main__':
-    with open('../models/svm_adj.p', 'rb') as f:
+    with open('../models/svm_final.p', 'rb') as f:
         clf = pickle.load(f)
 
     detector = CarDetector(clf,
@@ -65,7 +75,9 @@ if __name__ == '__main__':
                            stride=STRIDE,
                            y_start_stops=Y_START_STOPS,
                            image_size_factors=IMAGE_SIZE_FACTORS,
-                           iou_thresh=0.1,
+                           x_padding=X_PADDING,
+                           dist_thresh=0.1,
+                           n_frames=N_FRAMES,
                            n_jobs=N_JOBS)
 
     clip1 = VideoFileClip(VIDEOS[SELECTED_VIDEO])

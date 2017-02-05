@@ -1,14 +1,15 @@
-import multiprocessing
-
 import cv2
 import numpy as np
-from joblib import Parallel, delayed
 from scipy import ndimage as ndi
 from scipy.misc import imread
 from skimage.feature import blob_doh
 from skimage.feature import hog
 from skimage.feature import peak_local_max
 from skimage.morphology import watershed
+
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
 
 
 def create_bb_comparision(heat):
@@ -51,7 +52,7 @@ def create_bb_comparision(heat):
     return img
 
 
-def normalize(images, new_max=1., new_min=0., old_max=255, old_min=0, dtype=None):
+def normalize(images, new_max=1., new_min=0., old_max=None, old_min=None, dtype=None):
     """
     Normalizes images to a specified range
 
@@ -63,6 +64,12 @@ def normalize(images, new_max=1., new_min=0., old_max=255, old_min=0, dtype=None
     :param dtype: dtype for the output image. If not specified, the input type will be used.
     :return: normalized image
     """
+
+    if old_max is None:
+        old_max = images.max()
+
+    if old_min is None:
+        old_min = images.min()
 
     if dtype is None:
         dtype = images.dtype
@@ -96,9 +103,6 @@ def bb_by_contours(heat):
     boxes = []
     for j, contour in enumerate(contours):
         x, y, w, h = cv2.boundingRect(contour)
-        if w < 32 or h < 32:
-            continue
-
         boxes.append([x, y, x + w, y + h])
 
     return np.array(boxes)
@@ -424,8 +428,15 @@ def hog_feature_size(img, pix_per_cell, cells_per_block, orient):
     :return:
     """
 
-    n_cells_x = int(np.floor(img.shape[1] // pix_per_cell))
-    n_cells_y = int(np.floor(img.shape[0] // pix_per_cell))
+    if type(img) is np.ndarray and 1 < len(img.shape) < 4:
+        span_y, span_x = img.shape[0], img.shape[1]
+    elif type(img) in (tuple, list) and len(img) == 2:
+        span_y, span_x = img
+    else:
+        span_y, span_x = img, img
+
+    n_cells_x = int(np.floor(span_x // pix_per_cell))
+    n_cells_y = int(np.floor(span_y // pix_per_cell))
     n_blocks_x = (n_cells_x - cells_per_block) + 1
     n_blocks_y = (n_cells_y - cells_per_block) + 1
 
