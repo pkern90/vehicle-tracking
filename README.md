@@ -57,6 +57,8 @@ For each positive prediction, the [value of the decision function is added onto 
 
 ![Heatmap Threshold](output_images/thresh_heat_images.png)
 
+![Result Images](output_images/result_images.png)
+
 ## Bounding Boxes
 There are multiple ways of generating bounding boxes out of a heat map which varies in speed and quality. To find a suitable technique four different approaches were tested and compared in a [Jupiter notebook](Notebooks/Segmentation experiment.ipynb). In the end, findContour from openCV seemed to be the best choice since it had high quality while outperforming all the other techniques in regards to speed by orders of magnitude.
 
