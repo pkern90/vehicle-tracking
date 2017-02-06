@@ -29,7 +29,7 @@ To reduce the number of false positives, the optimized model was used on Udacity
 ## Feature engineering
 Finding the right features with the right parameters is a challenge itself. To simplify this process, the feature extraction was realized as a sklearn pipeline which allows to automatically tune parameters through a grid search.  Three different feature types were evaluated including HOG, color histogram and also spatial binning. For each of them, a custom transformer class was implemented to be used as part of a pipeline. Additional transformers were implemented to make the color histogram and spatial binning optional and to optimized the color space. Before merging the features they were all scaled to a range between 0 and 1 to prevent feature domination. A complete overview of the feature extraction pipeline can be found in the image below.
 
-![Feature Extraction Pipeline](docs/FeatureExtraction.svg)
+![Feature Extraction Pipeline](docs/FeatureExtraction.png)
 
 After training, the pipeline could directly be used to extract features from image patches. However, to improve performance, operations like color space transformation and HOG extraction are applied on the complete image instead of each individual patch during prediction. Therefore, that part had to be reimplemented in the detection component.
 
