@@ -3,14 +3,13 @@ import pickle
 import time
 
 import numpy as np
+from FeatureExtractionPipeline import SpatialBining, ColorHistogram, ColorSpaceConverter, \
+    OptionalBranch, OptionalPCA, AcceptEmptyMinMaxScaler
 from sklearn.metrics import classification_report
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.svm import LinearSVC
 from sklearn.utils import shuffle
-
-from FeatureExtractionPipeline import SpatialBining, ColorHistogram, ColorSpaceConverter, \
-    OptionalBranch, OptionalPCA, AcceptEmptyMinMaxScaler, HogExtractorOpenCV
 
 from VehicleTracking.FeatureExtractionPipeline import HogExtractor
 
@@ -34,14 +33,14 @@ if __name__ == '__main__':
     X_train, y_train = data['train']
     X_hnm, y_hnm = data_hnm
     X_val, y_val = data['val']
+    X_test, y_test = data['test']
 
     # sample = np.random.choice(len(y_train), SAMPLE_SIZE, replace=False)
     # X_train = X_train[sample]
     # y_train = y_train[sample]
 
-    # Concat train and validation set since we will use K-fold CV
-    # X_train = np.concatenate([X_train, X_hnm])
-    # y_train = np.concatenate([y_train, y_hnm])
+    X_train = np.concatenate([X_train, X_val])
+    y_train = np.concatenate([y_train, y_val])
 
     X_train, y_train = shuffle(X_train, y_train, random_state=7)
 
@@ -96,17 +95,17 @@ if __name__ == '__main__':
     print('Finished training after ', t2 - t, ' seconds')
 
     # Save the best estimator
-    with open('../models/svm_adj.p', 'wb') as f:
+    with open('../models/svm_final.p', 'wb') as f:
         pickle.dump(cls.best_estimator_, f)
 
     # Also save the grid search object for analysis
-    with open('../models/gridsearch_adj.p', 'wb') as f:
+    with open('../models/gridsearch_final.p', 'wb') as f:
         pickle.dump(cls, f)
 
     print('Best params: ', cls.best_params_)
     print('Best auc roc score: ', cls.best_score_)
     print('Train Accuracy of SVC = ', cls.best_estimator_.score(X_train, y_train))
-    print('Validation Accuracy of SVC = ', cls.best_estimator_.score(X_val, y_val))
+    print('Test Accuracy of SVC = ', cls.best_estimator_.score(X_test, y_test))
 
-    predictions = cls.predict(X_val)
-    print(classification_report(y_val, predictions, target_names=['no car', 'car']))
+    predictions = cls.predict(X_test)
+    print(classification_report(y_test, predictions, target_names=['no car', 'car']))
