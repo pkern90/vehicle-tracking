@@ -8,6 +8,7 @@ This project was created as an assessment for the Self-Driving Car Nanodegree Pr
 ![Result Images](output_images/result_images.png)
 
 ## Video
+[![Track 1](http://img.youtube.com/vi/8II-CLeJrIY/0.jpg)](http://www.youtube.com/watch?v=8II-CLeJrIY)
 
 # Vehicle Classifier
 In this section, I will describe the steps of implementing the vehicle detection model. The model building process was not sequential in the way it is described here. Instead, it was a highly iterative and experiment-driven process. 
