@@ -53,6 +53,8 @@ The system was designed to allow the definition of [multiple search areas](Vehic
 ## Heatmap
 For each positive prediction, the [value of the decision function is added onto a heatmap](VehicleTracking/CarDetector.py) in the area of the bounding box. When processing a video the heatmap is averaged over 8 frames to smoothen resulting bounding boxes. Before extracting the bounding boxes a gaussian blur is applied to the heatmap to reduce noise. To remove false positives the heatmap is then thresholded.
 
+![Positives](output_images/positives_images.png)
+
 ![Heatmap](output_images/heat_images.png)
 
 ![Heatmap Threshold](output_images/thresh_heat_images.png)
