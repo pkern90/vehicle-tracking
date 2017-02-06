@@ -36,7 +36,7 @@ After training, the pipeline could directly be used to extract features from ima
 ## Parameter optimization
 To keep the parameter space manageable, the grid search was executed in steps. On a first run, a Linear SMV with default parameter was used to find the best feature combination out of 2100. After that, a second run was performed to optimize the C parameter of the Linear SMV using the previously determined features. On every run, a 3 fold cross validation was used to find the optimal combination. The score used was AUC.
 
-![Gridsearch](models/result.png)
+![Gridsearch](output_images/cv.jpg)
 
 ## Evaluation
 The results of different experiments were compared in a Jupiter notebook to get a clear overview over thinks that worked and thinks that didn't. As main metric AUC (Area Under Curve. In this case ROC curve) was used since the distribution of vehicle and non-vehicle images were not always balanced in all the experiments. The score was calculated using the validation set. The final model was then retrained on the training and validation set and evaluated with the test set to get an estimate of its performance.  This score, therefore, can’t directly be compared to the experiment scores.
