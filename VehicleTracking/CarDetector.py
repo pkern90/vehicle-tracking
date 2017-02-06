@@ -2,7 +2,7 @@ import multiprocessing
 
 import cv2
 import numpy as np
-from ImageUtils import bb_by_contours
+from VehicleTracking.ImageUtils import bb_by_contours
 from joblib import Parallel
 from joblib import delayed
 from sklearn.pipeline import Pipeline
@@ -23,7 +23,8 @@ class CarDetector:
                  x_padding=None,
                  image_size_factors=[1],
                  n_frames=1,
-                 n_jobs=1):
+                 n_jobs=1,
+                 auto_draw=True):
         """
         Detects and tracks vehicles on a video stream.
 
@@ -41,6 +42,8 @@ class CarDetector:
         :param n_frames: Number of frame for averaging the detections
         :param n_jobs: The algorithm tries to run each search area on a separate cpu core.
          Therefore jobs > number of search areas wont't yield any improvements
+        :param auto_draw: if set to true, automatically draws detections on frame. Otherwise draw_info(img)
+        has to be called manually.
         """
 
         if stride is None:
@@ -60,6 +63,9 @@ class CarDetector:
         self.n_frames = n_frames
         self.heatmap = None
         self.x_padding = x_padding
+        self.heatmap_thresh = 2.5
+        self.auto_draw = auto_draw
+
 
     def process_frame(self, img):
         """
@@ -83,7 +89,7 @@ class CarDetector:
             heat = np.mean(self.heatmap, axis=2)
 
         heat_thresh = np.zeros(heat.shape, dtype=np.uint8)
-        heat_thresh[heat > 2.5] = 255
+        heat_thresh[heat > self.heatmap_thresh] = 255
 
         boxes_contours = bb_by_contours(heat_thresh)
         boxes_contours = self._remove_outliers(boxes_contours)
@@ -95,7 +101,8 @@ class CarDetector:
         self._create_new_detections(boxes_contours, used_boxes)
 
         self._remove_lost_detections()
-        img = self._draw_info(img)
+        if self.auto_draw:
+            img = self.draw_info(img)
         self.frame_cnt += 1
 
         return img
@@ -170,7 +177,7 @@ class CarDetector:
                 keep_detections.append(detection)
         self.detections = keep_detections
 
-    def _draw_info(self, img, age_threshold=8):
+    def draw_info(self, img, age_threshold=8):
         """
         Draws the bounding boxes for all detections which are old enough
         :param img:
@@ -183,8 +190,8 @@ class CarDetector:
                 self.n_vehicles += 1
                 img = detection.draw(img, thick=2, color=(255, 50, 0))
 
-        cv2.putText(img, 'Vehicles in sight: %s' % self.n_vehicles, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                    (255, 50, 0), 2)
+        cv2.putText(img, 'Vehicles in sight: %s' % self.n_vehicles, (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (255, 255, 255), 2)
 
         return img
 

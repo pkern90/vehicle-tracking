@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from ImageUtils import center_points, multi_bb_intersection_over_union
+from VehicleTracking.ImageUtils import center_points, multi_bb_intersection_over_union
 
 from VehicleTracking.ImageUtils import relative_distance
 
