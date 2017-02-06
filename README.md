@@ -22,8 +22,9 @@ Later the training set was modified again to account for classification deficits
 
 ![Augumented Images](output_images/augumented.png)
 
-To reduce the number of false positives, the optimized model was used on [Udacitys object detection crowd ai dataset](https://github.com/udacity/self-driving-car/tree/master/annotations), collecting image patches wrongly classified as vehicles. This process is called hnm which is short for hard negative mining. It generated 4740 additional images which were added to the training set for retraining the model. Unfortunately, it was not able to further improve the quality of the model which is why the hnm data was not used for training the final model.
+To reduce the number of false positives, the optimized model was used on [Udacitys object detection crowd ai dataset](https://github.com/udacity/self-driving-car/tree/master/annotations), collecting image patches wrongly classified as vehicles. This process is called hnm which is short for [hard negative mining](VehicleTracking/HardNegativeMining.py). It generated 4740 additional images which were added to the training set for retraining the model. Unfortunately, it was not able to further improve the quality of the model which is why the hnm data was not used for training the final model.
 
+The following image shows an example of a framed processed during the hnm. Blue bounding boxes are annotations from the dataset itself, green boxes are true positives and red boxes are false positives. The image shows only bounding boxes with high confidence.
 ![HNM](output_images/neg_mining.jpeg)
 
 ## Feature engineering
