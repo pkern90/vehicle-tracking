@@ -1,5 +1,3 @@
-import time
-
 import cv2
 import numpy as np
 from ImageUtils import center_points, multi_bb_intersection_over_union
@@ -50,7 +48,7 @@ class Detection:
             self.last_boxes.extend([box] * self.n_frames)
             self.is_hidden = False
 
-    def draw(self, img, color=(0, 0, 255), thick=6):
+    def draw(self, img, color=(0, 0, 255), thick=3):
         """
         Draws the bounding box of the detection on a given image.
         It also adds information on how long the detection has been active.
@@ -76,7 +74,7 @@ class Detection:
         cv2.putText(img, '%.1fs' % (self.age / FRAMES_PER_SEC),
                     (box_to_draw[0] + 10, box_to_draw[1] + 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                    (255, 0, 0), 2)
+                    color, 1)
         return img
 
     def iou_with(self, boxes):

@@ -181,10 +181,10 @@ class CarDetector:
         for detection in self.detections:
             if len(detection.last_boxes) > age_threshold:
                 self.n_vehicles += 1
-                img = detection.draw(img, thick=3, color=(255, 0, 0))
+                img = detection.draw(img, thick=2, color=(255, 50, 0))
 
         cv2.putText(img, 'Vehicles in sight: %s' % self.n_vehicles, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                    (255, 0, 0), 2)
+                    (255, 50, 0), 2)
 
         return img
 
@@ -308,10 +308,10 @@ def detect_cars(img, clf, xy_window, stride, cur_sizes_factors, cur_y_start_stop
     features = extract_features(img_scaled, clf, windows, cur_y_start_stop, xy_window, stride)
     des_func = clf.named_steps['clf'].decision_function(features)
 
+    windows = remove_padding_from_bb(windows, cur_x_padding)
     # windows have to be rescaled to account for the resized image
     windows = (windows / cur_sizes_factors).astype(np.uint32)
     windows = windows[des_func > 0]
-    windows = remove_padding_from_bb(windows, cur_x_padding)
 
     des_func = des_func[des_func > 0]
 

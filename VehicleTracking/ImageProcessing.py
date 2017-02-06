@@ -2,9 +2,7 @@ import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
-import time
-from ImageUtils import gaussian_blur, bb_by_contours, draw_boxes
-from CarDetector import detect_cars_multi_area
+from ImageUtils import bb_by_contours, draw_boxes
 from scipy.misc import imread
 from tqdm import tqdm
 
@@ -59,11 +57,17 @@ if __name__ == '__main__':
     with open('../models/svm_final.p', 'rb') as f:
         clf = pickle.load(f)
 
-        fig, axis = plt.subplots(2, 3)
-        for i in tqdm(range(0, 6)):
+        fig, axis = plt.subplots(1, 3)
+        for i in tqdm(range(0, 3)):
             img = imread('../test_images/test%s.jpg' % (i + 1))
-            heat = detect_cars_multi_area(img, clf, XY_WINDOW, STRIDE, Y_START_STOPS, IMAGE_SIZE_FACTORS, heatmap=True,
-                                           n_jobs=N_JOBS)
+            heat = detect_cars_multi_area(img,
+                                          clf,
+                                          XY_WINDOW,
+                                          STRIDE,
+                                          Y_START_STOPS,
+                                          IMAGE_SIZE_FACTORS,
+                                          heatmap=True,
+                                          n_jobs=N_JOBS)
 
             heat_thresh = np.zeros(heat.shape, dtype=np.uint8)
             heat_thresh[heat > 2.5] = 255
@@ -71,31 +75,8 @@ if __name__ == '__main__':
             boxes_contours = bb_by_contours(heat_thresh)
             img_contours = draw_boxes(img, boxes_contours, thick=3, color=(255, 0, 0))
 
-            axis[i // 3, i % 3].imshow(img_contours)
-            axis[i // 3, i % 3].axis('off')
+            axis[i % 3].imshow(img_contours)
+            axis[i % 3].axis('off')
 
         plt.tight_layout()
         plt.show()
-
-# img = imread('../test_images/test5.jpg')
-# img_blur = gaussian_blur(np.copy(img), 3)
-# heat = detect_cars_multi_area(img_blur,
-#                               clf,
-#                               XY_WINDOW,
-#                               STRIDE,
-#                               Y_START_STOPS,
-#                               IMAGE_SIZE_FACTORS,
-#                               X_PADDING,
-#                               heatmap=True,
-#                               n_jobs=N_JOBS)
-#
-# # heat = normalize(heat, new_max=1., new_min=0, dtype=np.float64)
-# heat_thresh = np.zeros(heat.shape, dtype=np.uint8)
-# heat_blur = gaussian_blur(heat, 21)
-#
-# heat_thresh[heat > 3.5] = 255
-#
-# boxes_contours = bb_by_contours(heat_thresh)
-# img_contours = draw_boxes(img, boxes_contours, thick=3, color=(255, 0, 0))
-# plt.imshow(heat, cmap='gray')
-# plt.show()

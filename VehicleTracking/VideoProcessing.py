@@ -11,7 +11,7 @@ from VehicleTracking.CarDetector import CarDetector
 DELETE_AFTER = 24
 
 # Number of frame for averaging the detections
-N_FRAMES = 8
+N_FRAMES = 10
 
 # Threshold for relative distance to join detections
 DIST_THRESH = 0.1
@@ -22,8 +22,8 @@ DIST_THRESH = 0.1
 # size and will be adjusted when resizing
 Y_START_STOPS = np.array([
     [400, 496],
-    [400, 544],
-    [496, 656],
+    [400, 536],
+    [488, 624],
     [400, 656],
 ])
 
@@ -64,9 +64,8 @@ N_JOBS = 4
 VIDEOS = ["../videos/project_video.mp4",
           "../videos/project_video_short.mp4",
           "../videos/project_video_very_short.mp4",
-          "../videos/challenge_video.mp4",
-          "../videos/harder_challenge_video.mp4"]
-SELECTED_VIDEO = 3
+          "../videos/challenge_video.mp4"]
+SELECTED_VIDEO = 0
 
 if __name__ == '__main__':
     with open('../models/svm_final.p', 'rb') as f:
