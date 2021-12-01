@@ -189,10 +189,7 @@ class OptionalPCA(BaseEstimator, TransformerMixin):
         :param n_components: When set to None no PCA will be applied.
         """
 
-        if n_components is None:
-            self.pca = None
-        else:
-            self.pca = PCA(n_components=n_components)
+        self.pca = None if n_components is None else PCA(n_components=n_components)
 
     def fit(self, images, y):
         if len(images[0]) == 0:

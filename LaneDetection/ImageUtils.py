@@ -20,9 +20,7 @@ def abs_sobel(img_ch, orient='x', sobel_kernel=3):
         raise ValueError('orient has to be "x" or "y" not "%s"' % orient)
 
     sobel = cv2.Sobel(img_ch, -1, *axis, ksize=sobel_kernel)
-    abs_s = np.absolute(sobel)
-
-    return abs_s
+    return np.absolute(sobel)
 
 
 def gradient_magnitude(sobel_x, sobel_y):
@@ -68,9 +66,7 @@ def extract_yellow(img):
     :return: Yellow 255 not yellow 0
     """
     hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
-    mask = cv2.inRange(hsv, (20, 50, 150), (40, 255, 255))
-
-    return mask
+    return cv2.inRange(hsv, (20, 50, 150), (40, 255, 255))
 
 
 def extract_dark(img):
@@ -80,8 +76,7 @@ def extract_dark(img):
     :return: Dark 255 not dark 0
     """
     hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
-    mask = cv2.inRange(hsv, (0, 0, 0.), (255, 153, 128))
-    return mask
+    return cv2.inRange(hsv, (0, 0, 0.), (255, 153, 128))
 
 
 def extract_highlights(img, p=99.9):
@@ -92,8 +87,7 @@ def extract_highlights(img, p=99.9):
     :return: Highlight 255 not highlight 0
     """
     p = int(np.percentile(img, p) - 30)
-    mask = cv2.inRange(img, p, 255)
-    return mask
+    return cv2.inRange(img, p, 255)
 
 
 def binary_noise_reduction(img, thresh):

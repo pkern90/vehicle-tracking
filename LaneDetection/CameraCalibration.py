@@ -54,15 +54,13 @@ def calculate_camera_calibration(path_pattern, rows, cols):
 
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, CAL_IMAGE_SIZE[:-1], None, None)
 
-    calibration = {'objpoints': objpoints,
+    return {'objpoints': objpoints,
                    'imgpoints': imgpoints,
                    'cal_images': cal_images,
                    'mtx': mtx,
                    'dist': dist,
                    'rvecs': rvecs,
                    'tvecs': tvecs}
-
-    return calibration
 
 
 def get_camera_calibration():

@@ -228,9 +228,7 @@ def bin_spatial(img, size=(32, 32)):
     :param size: tuple of (width, height)
     :return: array with n elements where n = size[0] * size[1]
     """
-    features = cv2.resize(img, size).ravel()
-
-    return features
+    return cv2.resize(img, size).ravel()
 
 
 def cut_out_window(img, window):

@@ -170,11 +170,13 @@ class CarDetector:
         :param age_threshold: minimum age of a detection before it is allowed to be hidden
         """
 
-        keep_detections = []
-        for detection in self.detections:
-            if detection.frames_undetected < self.delete_after and \
-                    not (detection.is_hidden and detection.age < age_threshold):
-                keep_detections.append(detection)
+        keep_detections = [
+            detection
+            for detection in self.detections
+            if detection.frames_undetected < self.delete_after
+            and not (detection.is_hidden and detection.age < age_threshold)
+        ]
+
         self.detections = keep_detections
 
     def draw_info(self, img, age_threshold=8):

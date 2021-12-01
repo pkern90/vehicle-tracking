@@ -26,10 +26,7 @@ if __name__ == '__main__':
     cam_calibrator = CameraCalibrator(img[:, :, 0].shape[::-1], cam_calibration)
     ld = LaneDetector(SRC, DST, n_frames=FRAME_MEMORY, cam_calibration=cam_calibrator, transform_offset=OFFSET)
 
-    images = []
-    for i in range(1, 12):
-        images.append(imread('../test_images/test%s.jpg' % i))
-
+    images = [imread('../test_images/test%s.jpg' % i) for i in range(1, 12)]
     rows = len(images)
     cols = 2
     fig, axis = plt.subplots(rows, cols)

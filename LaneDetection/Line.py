@@ -81,9 +81,7 @@ class Line:
         first_coefi_dif = np.abs(self.current_fit[0] - other_line.current_fit[0])
         second_coefi_dif = np.abs(self.current_fit[1] - other_line.current_fit[1])
 
-        is_parallel = first_coefi_dif < threshold[0] and second_coefi_dif < threshold[1]
-
-        return is_parallel
+        return first_coefi_dif < threshold[0] and second_coefi_dif < threshold[1]
 
     def get_current_fit_distance(self, other_line):
         """
@@ -118,6 +116,6 @@ def calc_curvature(fit_cr):
     y_eval = np.max(y)
 
     fit_cr = np.polyfit(y * ym_per_pix, x * xm_per_pix, 2)
-    curverad = ((1 + (2 * fit_cr[0] * y_eval / 2. + fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * fit_cr[0])
-
-    return curverad
+    return (
+        (1 + (2 * fit_cr[0] * y_eval / 2.0 + fit_cr[1]) ** 2) ** 1.5
+    ) / np.absolute(2 * fit_cr[0])
