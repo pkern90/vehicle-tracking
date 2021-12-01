@@ -43,10 +43,9 @@ class LaneDetector:
         """
         if len(left[0]) < 3 or len(right[0]) < 3:
             return False
-        else:
-            new_left = Line(y=left[0], x=left[1])
-            new_right = Line(y=right[0], x=right[1])
-            return are_lanes_plausible(new_left, new_right)
+        new_left = Line(y=left[0], x=left[1])
+        new_right = Line(y=right[0], x=right[1])
+        return are_lanes_plausible(new_left, new_right)
 
     def __check_lines(self, left_x, left_y, right_x, right_y):
         """

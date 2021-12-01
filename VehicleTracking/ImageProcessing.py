@@ -58,7 +58,7 @@ if __name__ == '__main__':
         clf = pickle.load(f)
 
         fig, axis = plt.subplots(1, 3)
-        for i in tqdm(range(0, 3)):
+        for i in tqdm(range(3)):
             img = imread('../test_images/test%s.jpg' % (i + 1))
             heat = detect_cars_multi_area(img,
                                           clf,
